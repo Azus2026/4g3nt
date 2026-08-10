@@ -1,4 +1,5 @@
 import * as api from '@protocolink/api';
+import * as common from '@protocolink/common';
 import { ethers } from 'ethers';
 import axios from 'axios';
 import { TokenConfig } from '../config/registry';
@@ -53,30 +54,36 @@ const RPC_FALLBACKS: Record<number, string> = {
   137: 'https://polygon-bor-rpc.publicnode.com',
   10: 'https://mainnet.optimism.io',
   8453: 'https://mainnet.base.org',
-  56: 'https://bsc-dataseed.binance.org',
-  43114: 'https://api.avax.network/ext/bc/C/rpc',
 };
 
 export class ProtocolinkClient {
 
   /**
-   * Genera la lógica de Préstamo Flash (Aave V3 / Balancer V2)
+   * Convierte un TokenConfig en una instancia válida de common.Token exigida por Protocolink SDK
+   */
+  toApiToken(token: TokenConfig): common.Token {
+    return new common.Token(token.chainId, token.address, token.decimals, token.symbol, token.name);
+  }
+
+  /**
+   * Genera la lógica de Préstamo Flash (Aave V3 / Balancer V2) con api.Token estricto
    */
   async getFlashLoanPair(token: TokenConfig, amount: string, chainId: number) {
-    const loans = [{ token: token, amount: amount }];
+    const apiToken = this.toApiToken(token);
+    const loans = [{ token: apiToken, amount: amount }];
 
     try {
-      if (ENV.flashLoanProvider === 'balancerv2' && (chainId === 1 || chainId === 137 || chainId === 42161)) {
+      if (ENV.flashLoanProvider === 'balancerv2' && (chainId === 1 || chainId === 42161)) {
         return api.protocols.balancerv2.newFlashLoanLogicPair(loans);
       }
       return api.protocols.aavev3.newFlashLoanLogicPair(loans);
-    } catch (err: any) {
+    } catch {
       return api.protocols.aavev3.newFlashLoanLogicPair(loans);
     }
   }
 
   /**
-   * Consulta cotización On-Chain directa usando el Quoter de Uniswap V3 para una tasa de comisión específica
+   * Consulta cotización On-Chain directa usando el Quoter de Uniswap V3
    */
   async getOnChainUniswapV3Quote(
     chainId: number,
@@ -114,7 +121,7 @@ export class ProtocolinkClient {
         outputAmount: formattedOut,
         logic: null,
       };
-    } catch (err: any) {
+    } catch {
       return null;
     }
   }
@@ -128,7 +135,7 @@ export class ProtocolinkClient {
     tokenOut: TokenConfig,
     amountIn: string
   ): Promise<DEXQuote | null> {
-    const chainSlugMap: Record<number, string> = { 1: 'ethereum', 42161: 'arbitrum', 137: 'polygon', 10: 'optimism', 8453: 'base', 56: 'bsc' };
+    const chainSlugMap: Record<number, string> = { 1: 'ethereum', 42161: 'arbitrum', 10: 'optimism', 8453: 'base' };
     const slug = chainSlugMap[chainId];
     if (!slug) return null;
 
@@ -156,7 +163,7 @@ export class ProtocolinkClient {
   }
 
   /**
-   * Consulta cotizaciones de Swap en DEXs por cadena (Resistente a fallos con retorno individual seguro)
+   * Consulta cotizaciones de Swap en DEXs por cadena
    */
   async getSwapQuotation(
     protocolId: string,
@@ -178,12 +185,14 @@ export class ProtocolinkClient {
 
       let quotation: any = null;
       let logic: any = null;
+      const apiTokenIn = this.toApiToken(tokenIn);
+      const apiTokenOut = this.toApiToken(tokenOut);
 
       if (protocolId === 'uniswap-v3') {
         try {
           quotation = await api.protocols.uniswapv3.getSwapTokenQuotation(chainId, {
-            input: { token: tokenIn, amount: amountIn },
-            tokenOut: tokenOut,
+            input: { token: apiTokenIn, amount: amountIn },
+            tokenOut: apiTokenOut,
           });
           logic = api.protocols.uniswapv3.newSwapTokenLogic(quotation);
         } catch {
@@ -191,14 +200,14 @@ export class ProtocolinkClient {
         }
       } else if (protocolId === 'openocean-v2') {
         quotation = await api.protocols.openoceanv2.getSwapTokenQuotation(chainId, {
-          input: { token: tokenIn, amount: amountIn },
-          tokenOut: tokenOut,
+          input: { token: apiTokenIn, amount: amountIn },
+          tokenOut: apiTokenOut,
         }).catch(() => null);
         if (quotation) logic = api.protocols.openoceanv2.newSwapTokenLogic(quotation);
       } else if (protocolId === 'paraswap-v5') {
         quotation = await api.protocols.paraswapv5.getSwapTokenQuotation(chainId, {
-          input: { token: tokenIn, amount: amountIn },
-          tokenOut: tokenOut,
+          input: { token: apiTokenIn, amount: amountIn },
+          tokenOut: apiTokenOut,
         }).catch(() => null);
         if (quotation) logic = api.protocols.paraswapv5.newSwapTokenLogic(quotation);
       }
@@ -214,8 +223,8 @@ export class ProtocolinkClient {
           logic,
         };
       }
-    } catch (error: any) {
-      // Ignorar errores de ruta sin lanzar excepción
+    } catch {
+      // Ignorar errores de ruta
     }
 
     return null;
@@ -227,18 +236,21 @@ export class ProtocolinkClient {
   async getProtocolinkLogic(chainId: number, quote: DEXQuote) {
     if (quote.logic) return quote.logic;
 
+    const apiTokenIn = this.toApiToken(quote.inputToken);
+    const apiTokenOut = this.toApiToken(quote.outputToken);
+
     try {
       const psQuote = await api.protocols.paraswapv5.getSwapTokenQuotation(chainId, {
-        input: { token: quote.inputToken, amount: quote.inputAmount },
-        tokenOut: quote.outputToken,
+        input: { token: apiTokenIn, amount: quote.inputAmount },
+        tokenOut: apiTokenOut,
       }).catch(() => null);
       if (psQuote) {
         return api.protocols.paraswapv5.newSwapTokenLogic(psQuote);
       }
 
       const uniQuote = await api.protocols.uniswapv3.getSwapTokenQuotation(chainId, {
-        input: { token: quote.inputToken, amount: quote.inputAmount },
-        tokenOut: quote.outputToken,
+        input: { token: apiTokenIn, amount: quote.inputAmount },
+        tokenOut: apiTokenOut,
       }).catch(() => null);
       if (uniQuote) {
         return api.protocols.uniswapv3.newSwapTokenLogic(uniQuote);

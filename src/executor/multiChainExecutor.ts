@@ -2,6 +2,7 @@ import { ethers } from 'ethers';
 import { ENV } from '../config/env';
 import { ProtocolinkClient, ArbitrageOpportunity } from '../protocolink/protocolinkClient';
 import { RPCManager } from '../providers/rpcManager';
+import { addScanLog } from '../server';
 import { logger } from '../utils/logger';
 
 const FLASHBOTS_RPC_MAP: Record<number, string> = {
@@ -103,12 +104,26 @@ export class MultiChainExecutor {
       });
 
       logger.success(`🛡️ Transacción privada enviada a Flashbots. Hash: ${tx.hash}`);
+      addScanLog(`🚀 [LIVE MEV EXECUTION] Transacción transmitida. Hash: ${tx.hash}`);
+
       const receipt = await tx.wait();
       if (receipt && receipt.status === 1) {
-        logger.success(`🎉 Transacción confirmada en bloque #${receipt.blockNumber}! Arbitraje ejecutado.`);
+        const explorerMap: Record<number, string> = {
+          1: 'https://etherscan.io/tx/',
+          42161: 'https://arbiscan.io/tx/',
+          137: 'https://polygonscan.com/tx/',
+          8453: 'https://basescan.org/tx/',
+          10: 'https://optimistic.etherscan.io/tx/',
+          56: 'https://bscscan.com/tx/',
+          43114: 'https://snowtrace.io/tx/',
+        };
+        const explorerUrl = (explorerMap[opportunity.chainId] || 'https://etherscan.io/tx/') + tx.hash;
+        logger.success(`🎉 Transacción confirmada en bloque #${receipt.blockNumber}! Explorer: ${explorerUrl}`);
+        addScanLog(`🎉 [CONFIRMADA] Arbitraje Ejecutado Bloque #${receipt.blockNumber} | Explorer: ${explorerUrl}`);
         return true;
       } else {
         logger.error(`Transacción revertida.`);
+        addScanLog(`❌ Transacción de arbitraje revertida sin costo en gas.`);
         return false;
       }
     } catch (err: any) {

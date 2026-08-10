@@ -1,5 +1,6 @@
 import { ENV } from './config/env';
 import { MULTI_CHAIN_ARBITRAGE_PAIRS, SWARM_AGENTS } from './config/registry';
+import { SUPPORTED_CHAINS } from './config/chains';
 import { RPCManager } from './providers/rpcManager';
 import { SwarmManager } from './cluster/swarmManager';
 import { startServer, setSwarmManager } from './server';
@@ -18,9 +19,12 @@ async function main() {
   const rpcManager = new RPCManager();
   await rpcManager.loadChainlistRPCs();
 
-  // Benchmark preliminar en Ethereum Mainnet y Arbitrum
-  await rpcManager.benchmarkAndSelectBestRPC(1);
-  await rpcManager.benchmarkAndSelectBestRPC(42161);
+  // Benchmark preliminar para TODAS las cadenas (Ethereum, Arbitrum, Optimism, Polygon, Base, BSC, Avalanche)
+  logger.info('Iniciando benchmark de latencia RPC para todas las cadenas soportadas...');
+  for (const chainIdStr of Object.keys(SUPPORTED_CHAINS)) {
+    const chainId = parseInt(chainIdStr, 10);
+    await rpcManager.benchmarkAndSelectBestRPC(chainId).catch(() => {});
+  }
 
   // 2. Inicializar Swarm Cluster de 10 Agentes
   const swarmManager = new SwarmManager(rpcManager);

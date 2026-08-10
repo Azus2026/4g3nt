@@ -60,6 +60,7 @@ export class AgentWorker {
             timestamp: new Date().toISOString(),
             agentId: this.definition.id,
             agentName: this.definition.name,
+            status: 'ACTIVE',
             ...opp,
           };
 
@@ -77,6 +78,22 @@ export class AgentWorker {
             this.status = 'EXECUTING';
             await this.executor.execute(opp);
           }
+        } else {
+          // Informar escaneo activo para pares en búsqueda de liquidez
+          LIVE_PAIR_RESULTS[pair.id] = {
+            timestamp: new Date().toISOString(),
+            agentId: this.definition.id,
+            agentName: this.definition.name,
+            pairId: pair.id,
+            pairName: pair.name,
+            chainId: pair.chainId,
+            status: 'ROUTE_SEARCH',
+            leg1: { protocolId: 'UNISWAP-V3' },
+            leg2: { protocolId: 'SUSHISWAP' },
+            netProfitUSD: 0,
+            estimatedGasUSD: 0.05,
+            isProfitable: false,
+          };
         }
       }
     } catch (err: any) {

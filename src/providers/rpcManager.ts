@@ -13,6 +13,7 @@ export interface ActiveRPC {
 export class RPCManager {
   private activeProviders: Map<number, ActiveRPC> = new Map();
   private customRpcCache: Map<number, string[]> = new Map();
+  private wsProviders: Map<number, ethers.WebSocketProvider> = new Map();
 
   constructor() {
     this.initDefaultRpc();
@@ -29,6 +30,29 @@ export class RPCManager {
         latencyMs: 100,
         provider,
       });
+    }
+  }
+
+  /**
+   * Conecta al canal WebSocket wss:// para escuchar eventos newHeads en milisegundo 0
+   */
+  subscribeNewHeads(chainId: number, callback: (blockNumber: number) => void): void {
+    const chain = SUPPORTED_CHAINS[chainId];
+    if (!chain || !chain.wssUrl) return;
+
+    try {
+      const wsProvider = new ethers.WebSocketProvider(chain.wssUrl, chainId);
+      wsProvider.on('block', (blockNumber: number) => {
+        logger.rpc(`[WSS - Chain ${chainId}] ⚡ Nuevo Bloque Detectado #${blockNumber} (Milisegundo 0)`);
+        callback(blockNumber);
+      });
+      wsProvider.on('error', () => {
+        // Fallback silencioso en fallo de WSS
+      });
+
+      this.wsProviders.set(chainId, wsProvider);
+    } catch {
+      // Usar polling HTTP de respaldo si WSS no está disponible
     }
   }
 

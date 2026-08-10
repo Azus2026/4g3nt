@@ -2,7 +2,6 @@ import { ArbitragePair } from '../config/registry';
 import { ENV } from '../config/env';
 import { ProtocolinkClient, DEXQuote, ArbitrageOpportunity } from '../protocolink/protocolinkClient';
 import { CEXFetcher } from '../cex/cexFetcher';
-import { logger } from '../utils/logger';
 
 export class ArbitrageScanner {
   private client: ProtocolinkClient;
@@ -15,14 +14,14 @@ export class ArbitrageScanner {
   }
 
   /**
-   * Escanea una pareja de tokens en su cadena correspondiente buscando discrepancias DEX/CEX
+   * Escanea de forma individual para una cantidad de préstamo específica
    */
-  async scanPair(pair: ArbitragePair): Promise<ArbitrageOpportunity | null> {
-    const { tokenA, tokenB, defaultLoanAmount, approxPriceUSD, chainId, cexSymbol } = pair;
+  private async evaluatePairForAmount(pair: ArbitragePair, loanAmountStr: string): Promise<ArbitrageOpportunity | null> {
+    const { tokenA, tokenB, approxPriceUSD, chainId, cexSymbol } = pair;
 
-    // 1. Obtener cotizaciones para la Leg 1 (TokenA -> TokenB) con captura individual de errores
+    // 1. Leg 1: TokenA -> TokenB
     const leg1QuotesPromises = this.supportedProtocols.map(proto =>
-      this.client.getSwapQuotation(proto, chainId, tokenA, tokenB, defaultLoanAmount).catch(() => null)
+      this.client.getSwapQuotation(proto, chainId, tokenA, tokenB, loanAmountStr).catch(() => null)
     );
     const leg1QuotesRaw = await Promise.all(leg1QuotesPromises);
     const leg1Quotes = leg1QuotesRaw.filter((q): q is DEXQuote => q !== null && parseFloat(q.outputAmount) > 0);
@@ -32,7 +31,7 @@ export class ArbitrageScanner {
     leg1Quotes.sort((a, b) => parseFloat(b.outputAmount) - parseFloat(a.outputAmount));
     const bestLeg1 = leg1Quotes[0];
 
-    // 2. Obtener cotizaciones para la Leg 2 (TokenB -> TokenA) con captura individual de errores
+    // 2. Leg 2: TokenB -> TokenA
     const leg2QuotesPromises = this.supportedProtocols.map(proto =>
       this.client.getSwapQuotation(proto, chainId, tokenB, tokenA, bestLeg1.outputAmount).catch(() => null)
     );
@@ -45,7 +44,7 @@ export class ArbitrageScanner {
     leg2Quotes.sort((a, b) => parseFloat(b.outputAmount) - parseFloat(a.outputAmount));
     const bestLeg2 = leg2Quotes[0];
 
-    // 3. Obtener cotización de CEX si está disponible
+    // 3. CEX Reference Ticker
     let cexAvgPriceUSD: number | undefined;
     let cexSpreadPercent: number | undefined;
 
@@ -53,14 +52,15 @@ export class ArbitrageScanner {
       const cexInfo = await this.cexFetcher.getAggregatedCEXPrice(cexSymbol).catch(() => ({ avgPrice: 0 }));
       if (cexInfo.avgPrice > 0) {
         cexAvgPriceUSD = cexInfo.avgPrice;
-        const dexImpliedPrice = (parseFloat(defaultLoanAmount) * approxPriceUSD) / parseFloat(bestLeg1.outputAmount);
+        const dexImpliedPrice = (parseFloat(loanAmountStr) * approxPriceUSD) / parseFloat(bestLeg1.outputAmount);
         cexSpreadPercent = Math.abs(((dexImpliedPrice - cexAvgPriceUSD) / cexAvgPriceUSD) * 100);
       }
     }
 
-    // 4. Cálculos de comisiones y ganancia neta
-    const flashLoanFeeRate = ENV.flashLoanProvider === 'balancerv2' ? 0.0 : 0.0005;
-    const loanNum = parseFloat(defaultLoanAmount);
+    // 4. Balancer 0.00% Flash Loan Fee vs Aave 0.05%
+    const isBalancerSupported = chainId === 1 || chainId === 137 || chainId === 42161;
+    const flashLoanFeeRate = isBalancerSupported ? 0.00 : 0.0005;
+    const loanNum = parseFloat(loanAmountStr);
     const flashLoanFeeNum = loanNum * flashLoanFeeRate;
     const totalRequiredToRepay = loanNum + flashLoanFeeNum;
 
@@ -68,7 +68,7 @@ export class ArbitrageScanner {
     const grossProfitTokenA = returnTokenANum - totalRequiredToRepay;
     const grossProfitUSD = grossProfitTokenA * approxPriceUSD;
 
-    // Ajuste de estimación de Gas por Cadena (L1 ~350k gas, L2 ~150k gas)
+    // Estimación Gas
     const gasUnits = chainId === 1 ? 350000 : 150000;
     const gweiPrice = chainId === 1 ? 20 : 0.1;
     const estimatedGasEth = (gasUnits * gweiPrice * 1e-9);
@@ -81,7 +81,7 @@ export class ArbitrageScanner {
       pairId: pair.id,
       pairName: pair.name,
       chainId,
-      flashLoanAmount: defaultLoanAmount,
+      flashLoanAmount: loanAmountStr,
       tokenA,
       tokenB,
       leg1: bestLeg1,
@@ -96,5 +96,28 @@ export class ArbitrageScanner {
       cexReferencePriceUSD: cexAvgPriceUSD,
       cexDEXSpreadPercent: cexSpreadPercent,
     };
+  }
+
+  /**
+   * Búsqueda Binaria del Préstamo Óptimo (Sweet Spot Loan Search)
+   * Probará multiplicadores de préstamo (0.5x, 1.0x, 2.0x) para encontrar el mayor margen USD
+   */
+  async scanPair(pair: ArbitragePair): Promise<ArbitrageOpportunity | null> {
+    const baseAmountNum = parseFloat(pair.defaultLoanAmount);
+    const candidateAmounts = [
+      (baseAmountNum * 0.5).toString(),
+      baseAmountNum.toString(),
+      (baseAmountNum * 2.0).toString(),
+    ];
+
+    const resultsPromises = candidateAmounts.map(amt => this.evaluatePairForAmount(pair, amt).catch(() => null));
+    const resultsRaw = await Promise.all(resultsPromises);
+    const validResults = resultsRaw.filter((r): r is ArbitrageOpportunity => r !== null);
+
+    if (validResults.length === 0) return null;
+
+    // Seleccionar la oportunidad con mayor Net Profit USD
+    validResults.sort((a, b) => b.netProfitUSD - a.netProfitUSD);
+    return validResults[0];
   }
 }

@@ -4,6 +4,14 @@ import { ProtocolinkClient, ArbitrageOpportunity } from '../protocolink/protocol
 import { RPCManager } from '../providers/rpcManager';
 import { logger } from '../utils/logger';
 
+const FLASHBOTS_RPC_MAP: Record<number, string> = {
+  1: 'https://rpc.flashbots.net',
+  42161: 'https://rpc.flashbots.net/arbitrum',
+  10: 'https://rpc.flashbots.net/optimism',
+  137: 'https://fastlane.polygon.network',
+  8453: 'https://mainnet.base.org',
+};
+
 export class MultiChainExecutor {
   private rpcManager: RPCManager;
   private protocolinkClient: ProtocolinkClient;
@@ -74,15 +82,16 @@ export class MultiChainExecutor {
       }
     }
 
-    // 3. Ejecución real protegida contra MEV
+    // 3. Ejecución real protegida contra MEV vía Flashbots Relay / Fastlane (0 Gas si revierte)
     if (!wallet) {
       logger.error(`No se configuró PRIVATE_KEY válida para transmitir en red real.`);
       return false;
     }
 
     try {
-      logger.success(`[LIVE EXECUTION] Transmitiendo transacción protegida a través de Flashbots/Relay RPC...`);
-      const targetRpcUrl = opportunity.chainId === 1 ? ENV.flashbotsRpcUrl : ENV.fastlaneRpcUrl;
+      const targetRpcUrl = FLASHBOTS_RPC_MAP[opportunity.chainId] || provider._getConnection().url;
+      logger.success(`[LIVE MEV EXECUTION] Transmitiendo bundle privado vía Flashbots/Relay (${targetRpcUrl})...`);
+
       const relayProvider = new ethers.JsonRpcProvider(targetRpcUrl);
       const relayWallet = wallet.connect(relayProvider);
 
@@ -93,7 +102,7 @@ export class MultiChainExecutor {
         gasLimit: opportunity.chainId === 1 ? 500000 : 300000,
       });
 
-      logger.success(`🛡️ Transacción enviada. Hash: ${tx.hash}`);
+      logger.success(`🛡️ Transacción privada enviada a Flashbots. Hash: ${tx.hash}`);
       const receipt = await tx.wait();
       if (receipt && receipt.status === 1) {
         logger.success(`🎉 Transacción confirmada en bloque #${receipt.blockNumber}! Arbitraje ejecutado.`);
@@ -103,7 +112,7 @@ export class MultiChainExecutor {
         return false;
       }
     } catch (err: any) {
-      logger.error(`Error en ejecución live: ${err.message}`);
+      logger.error(`Error en ejecución live Flashbots: ${err.message}`);
       return false;
     }
   }

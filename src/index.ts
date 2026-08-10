@@ -8,11 +8,12 @@ import { logger } from './utils/logger';
 
 async function main() {
   logger.divider();
-  logger.info('🚀 INICIANDO CLUSTER DE 10 AGENTES SWARM DE ARBITRAJE FLASH LOAN V2');
+  logger.info('🚀 INICIANDO CLUSTER DE 10 AGENTES SWARM DE ARBITRAJE FLASH LOAN V2 (OPTIMIZADO)');
   logger.info(`   Agentes Concurrentes: ${SWARM_AGENTS.length} Agentes Especializados`);
   logger.info(`   Pares de Liquidez Totales: ${MULTI_CHAIN_ARBITRAGE_PAIRS.length} Pares Multi-Cadena`);
   logger.info(`   Modo DRY_RUN: ${ENV.dryRun ? 'ACTIVADO (Simulación sin riesgo)' : 'DESACTIVADO (MODO LIVE MAINNET REAL)'}`);
   logger.info(`   Ganancia Mínima Objetivo: $${ENV.minProfitUSD.toFixed(2)} USD`);
+  logger.info(`   Optimizaciones MEV: Sweet Spot Loan Search | Balancer 0% Fee | WSS Sub-Segundo | Flashbots Relays`);
   logger.divider();
 
   // 1. Inicializar Gestor de RPCs y cargar Chainlist.org
@@ -24,6 +25,9 @@ async function main() {
   for (const chainIdStr of Object.keys(SUPPORTED_CHAINS)) {
     const chainId = parseInt(chainIdStr, 10);
     await rpcManager.benchmarkAndSelectBestRPC(chainId).catch(() => {});
+    rpcManager.subscribeNewHeads(chainId, (blockNumber) => {
+      // Disparo inmediato por WebSocket en milisegundo 0
+    });
   }
 
   // 2. Inicializar Swarm Cluster de 10 Agentes

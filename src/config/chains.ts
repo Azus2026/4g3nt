@@ -4,6 +4,7 @@ export interface ChainConfig {
   symbol: string;
   nativeToken: string;
   defaultRpcUrls: string[];
+  wssUrl: string;
   blockExplorer: string;
   flashLoanProviders: string[];
 }
@@ -20,8 +21,9 @@ export const SUPPORTED_CHAINS: Record<number, ChainConfig> = {
       'https://rpc.ankr.com/eth',
       'https://ethereum.publicnode.com',
     ],
+    wssUrl: 'wss://ethereum-rpc.publicnode.com',
     blockExplorer: 'https://etherscan.io',
-    flashLoanProviders: ['aavev3', 'balancerv2', 'uniswapv3'],
+    flashLoanProviders: ['balancerv2', 'aavev3', 'uniswapv3'],
   },
   42161: {
     chainId: 42161,
@@ -33,8 +35,9 @@ export const SUPPORTED_CHAINS: Record<number, ChainConfig> = {
       'https://arbitrum.llamarpc.com',
       'https://rpc.ankr.com/arbitrum',
     ],
+    wssUrl: 'wss://arbitrum-one-rpc.publicnode.com',
     blockExplorer: 'https://arbiscan.io',
-    flashLoanProviders: ['aavev3', 'balancerv2'],
+    flashLoanProviders: ['balancerv2', 'aavev3'],
   },
   10: {
     chainId: 10,
@@ -46,6 +49,7 @@ export const SUPPORTED_CHAINS: Record<number, ChainConfig> = {
       'https://optimism.llamarpc.com',
       'https://rpc.ankr.com/optimism',
     ],
+    wssUrl: 'wss://optimism-rpc.publicnode.com',
     blockExplorer: 'https://optimistic.etherscan.io',
     flashLoanProviders: ['aavev3'],
   },
@@ -59,8 +63,9 @@ export const SUPPORTED_CHAINS: Record<number, ChainConfig> = {
       'https://polygon.llamarpc.com',
       'https://rpc.ankr.com/polygon',
     ],
+    wssUrl: 'wss://polygon-bor-rpc.publicnode.com',
     blockExplorer: 'https://polygonscan.com',
-    flashLoanProviders: ['aavev3', 'balancerv2'],
+    flashLoanProviders: ['balancerv2', 'aavev3'],
   },
   8453: {
     chainId: 8453,
@@ -72,6 +77,7 @@ export const SUPPORTED_CHAINS: Record<number, ChainConfig> = {
       'https://base.llamarpc.com',
       'https://rpc.ankr.com/base',
     ],
+    wssUrl: 'wss://base-rpc.publicnode.com',
     blockExplorer: 'https://basescan.org',
     flashLoanProviders: ['aavev3'],
   },
@@ -85,6 +91,7 @@ export const SUPPORTED_CHAINS: Record<number, ChainConfig> = {
       'https://bsc.llamarpc.com',
       'https://rpc.ankr.com/bsc',
     ],
+    wssUrl: 'wss://bsc-rpc.publicnode.com',
     blockExplorer: 'https://bscscan.com',
     flashLoanProviders: ['pancakeswapv3'],
   },
@@ -97,6 +104,7 @@ export const SUPPORTED_CHAINS: Record<number, ChainConfig> = {
       process.env.AVAX_RPC_URL || 'https://api.avax.network/ext/bc/C/rpc',
       'https://avalanche.llamarpc.com',
     ],
+    wssUrl: 'wss://avalanche-c-chain-rpc.publicnode.com',
     blockExplorer: 'https://snowtrace.io',
     flashLoanProviders: ['aavev3'],
   },

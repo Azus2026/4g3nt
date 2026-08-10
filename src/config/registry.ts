@@ -61,22 +61,25 @@ export const SWARM_AGENTS: AgentDefinition[] = [
 
 export const TOKENS: Record<string, TokenConfig> = {
   // Ethereum Mainnet (1)
-  WETH_ETH: { chainId: 1, address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', decimals: 18, symbol: 'WETH', name: 'Wrapped Ether' },
-  USDC_ETH: { chainId: 1, address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', decimals: 6, symbol: 'USDC', name: 'USD Coin' },
-  USDT_ETH: { chainId: 1, address: '0xdAC17F958D2ee523a2206206994597C13D831ec7', decimals: 6, symbol: 'USDT', name: 'Tether USD' },
-  WBTC_ETH: { chainId: 1, address: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599', decimals: 8, symbol: 'WBTC', name: 'Wrapped BTC' },
-  DAI_ETH:  { chainId: 1, address: '0x6B175474E89094C44Da98b954EedeAC495271d0F', decimals: 18, symbol: 'DAI', name: 'Dai Stablecoin' },
-  LINK_ETH: { chainId: 1, address: '0x514910771AF9Ca656af840dff83E8264EcF986CA', decimals: 18, symbol: 'LINK', name: 'Chainlink' },
-  UNI_ETH:  { chainId: 1, address: '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984', decimals: 18, symbol: 'UNI', name: 'Uniswap' },
-  AAVE_ETH: { chainId: 1, address: '0x7Fc66500c84A76Ad7e9c93437b45Ac5b2CE65697', decimals: 18, symbol: 'AAVE', name: 'Aave' },
-  MKR_ETH:  { chainId: 1, address: '0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2', decimals: 18, symbol: 'MKR', name: 'Maker' },
-  PEPE_ETH: { chainId: 1, address: '0x6982508145454Ce325dDbE47a25d4ec3d2311933', decimals: 18, symbol: 'PEPE', name: 'Pepe' },
+  WETH_ETH:   { chainId: 1, address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', decimals: 18, symbol: 'WETH', name: 'Wrapped Ether' },
+  USDC_ETH:   { chainId: 1, address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', decimals: 6, symbol: 'USDC', name: 'USD Coin' },
+  USDT_ETH:   { chainId: 1, address: '0xdAC17F958D2ee523a2206206994597C13D831ec7', decimals: 6, symbol: 'USDT', name: 'Tether USD' },
+  WBTC_ETH:   { chainId: 1, address: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599', decimals: 8, symbol: 'WBTC', name: 'Wrapped BTC' },
+  DAI_ETH:    { chainId: 1, address: '0x6B175474E89094C44Da98b954EedeAC495271d0F', decimals: 18, symbol: 'DAI', name: 'Dai Stablecoin' },
+  LINK_ETH:   { chainId: 1, address: '0x514910771AF9Ca656af840dff83E8264EcF986CA', decimals: 18, symbol: 'LINK', name: 'Chainlink' },
+  UNI_ETH:    { chainId: 1, address: '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984', decimals: 18, symbol: 'UNI', name: 'Uniswap' },
+  AAVE_ETH:   { chainId: 1, address: '0x7Fc66500c84A76Ad7e9c93437b45Ac5b2CE65697', decimals: 18, symbol: 'AAVE', name: 'Aave' },
+  MKR_ETH:    { chainId: 1, address: '0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2', decimals: 18, symbol: 'MKR', name: 'Maker' },
+  PEPE_ETH:   { chainId: 1, address: '0x6982508145454Ce325dDbE47a25d4ec3d2311933', decimals: 18, symbol: 'PEPE', name: 'Pepe' },
+  PENDLE_ETH: { chainId: 1, address: '0x808507121B80c02388fAd14726482e061B8da827', decimals: 18, symbol: 'PENDLE', name: 'Pendle' },
+  ENA_ETH:    { chainId: 1, address: '0x57e114B691db790C35207b2e685D4A43181e664D', decimals: 18, symbol: 'ENA', name: 'Ethena' },
 
   // Arbitrum One (42161)
   WETH_ARB: { chainId: 42161, address: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1', decimals: 18, symbol: 'WETH', name: 'Wrapped Ether' },
   USDC_ARB: { chainId: 42161, address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831', decimals: 6, symbol: 'USDC', name: 'USD Coin' },
   USDT_ARB: { chainId: 42161, address: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9', decimals: 6, symbol: 'USDT', name: 'Tether USD' },
   ARB_ARB:  { chainId: 42161, address: '0x912CE59144191C1204E64559FE8253a0e49E6548', decimals: 18, symbol: 'ARB', name: 'Arbitrum' },
+  GMX_ARB:  { chainId: 42161, address: '0xf4756139c151178f965539a4a0ee8077c449c433', decimals: 18, symbol: 'GMX', name: 'GMX' },
 
   // Polygon PoS (137)
   WMATIC_POL: { chainId: 137, address: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270', decimals: 18, symbol: 'WMATIC', name: 'Wrapped MATIC' },
@@ -104,10 +107,12 @@ export const MULTI_CHAIN_ARBITRAGE_PAIRS: ArbitragePair[] = [
   { id: 'ETH-LINK-WETH', name: 'LINK / WETH (Mainnet)', chainId: 1, tokenA: TOKENS.LINK_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '500', approxPriceUSD: 16, cexSymbol: 'LINKUSDT', assignedAgentId: 2 },
   { id: 'ETH-UNI-WETH',  name: 'UNI / WETH (Mainnet)', chainId: 1, tokenA: TOKENS.UNI_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '1000', approxPriceUSD: 8, cexSymbol: 'UNIUSDT', assignedAgentId: 2 },
   { id: 'ETH-AAVE-WETH', name: 'AAVE / WETH (Mainnet)', chainId: 1, tokenA: TOKENS.AAVE_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '50', approxPriceUSD: 90, cexSymbol: 'AAVEUSDT', assignedAgentId: 2 },
+  { id: 'ETH-PENDLE-WETH', name: 'PENDLE / WETH (Mainnet)', chainId: 1, tokenA: TOKENS.PENDLE_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '1000', approxPriceUSD: 5, cexSymbol: 'PENDLEUSDT', assignedAgentId: 2 },
 
   // Agent 3: Arbitrum Swarm
   { id: 'ARB-WETH-USDC', name: 'WETH / USDC (Arbitrum)', chainId: 42161, tokenA: TOKENS.WETH_ARB, tokenB: TOKENS.USDC_ARB, defaultLoanAmount: '5', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 3 },
   { id: 'ARB-ARB-WETH',  name: 'ARB / WETH (Arbitrum)', chainId: 42161, tokenA: TOKENS.ARB_ARB, tokenB: TOKENS.WETH_ARB, defaultLoanAmount: '5000', approxPriceUSD: 0.6, cexSymbol: 'ARBUSDT', assignedAgentId: 3 },
+  { id: 'ARB-GMX-WETH',  name: 'GMX / WETH (Arbitrum)', chainId: 42161, tokenA: TOKENS.GMX_ARB, tokenB: TOKENS.WETH_ARB, defaultLoanAmount: '100', approxPriceUSD: 28, cexSymbol: 'GMXUSDT', assignedAgentId: 3 },
 
   // Agent 4: Polygon Swarm
   { id: 'POL-WMATIC-USDC', name: 'WMATIC / USDC (Polygon)', chainId: 137, tokenA: TOKENS.WMATIC_POL, tokenB: TOKENS.USDC_POL, defaultLoanAmount: '10000', approxPriceUSD: 0.5, cexSymbol: 'MATICUSDT', assignedAgentId: 4 },
@@ -120,8 +125,9 @@ export const MULTI_CHAIN_ARBITRAGE_PAIRS: ArbitragePair[] = [
 
   // Agent 6: BNB & Avalanche Placeholder Swarm
   { id: 'ETH-MKR-WETH', name: 'MKR / WETH (Mainnet)', chainId: 1, tokenA: TOKENS.MKR_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '2', approxPriceUSD: 2500, cexSymbol: 'MKRUSDT', assignedAgentId: 6 },
+  { id: 'ETH-ENA-WETH', name: 'ENA / WETH (Mainnet)', chainId: 1, tokenA: TOKENS.ENA_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '3000', approxPriceUSD: 0.7, cexSymbol: 'ENAUSDT', assignedAgentId: 6 },
 
-  // Agent 7: Stablecoin Pegs (Balanced loan sizes to avoid artificial slippage)
+  // Agent 7: Stablecoin Pegs
   { id: 'ETH-USDC-USDT', name: 'USDC / USDT (Mainnet Stable)', chainId: 1, tokenA: TOKENS.USDC_ETH, tokenB: TOKENS.USDT_ETH, defaultLoanAmount: '2000', approxPriceUSD: 1, cexSymbol: 'USDCUSDT', assignedAgentId: 7 },
   { id: 'ETH-WETH-DAI',  name: 'WETH / DAI (Mainnet Stable)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.DAI_ETH, defaultLoanAmount: '10', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 7 },
   { id: 'ARB-USDC-USDT', name: 'USDC / USDT (Arbitrum Stable)', chainId: 42161, tokenA: TOKENS.USDC_ARB, tokenB: TOKENS.USDT_ARB, defaultLoanAmount: '1000', approxPriceUSD: 1, cexSymbol: 'USDCUSDT', assignedAgentId: 7 },

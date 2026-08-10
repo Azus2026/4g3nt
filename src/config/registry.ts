@@ -77,7 +77,6 @@ export const TOKENS: Record<string, TokenConfig> = {
   USDC_ARB: { chainId: 42161, address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831', decimals: 6, symbol: 'USDC', name: 'USD Coin' },
   USDT_ARB: { chainId: 42161, address: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9', decimals: 6, symbol: 'USDT', name: 'Tether USD' },
   ARB_ARB:  { chainId: 42161, address: '0x912CE59144191C1204E64559FE8253a0e49E6548', decimals: 18, symbol: 'ARB', name: 'Arbitrum' },
-  GMX_ARB:  { chainId: 42161, address: '0xf4756139c151178f965539a4a0ee8077c449c433', decimals: 18, symbol: 'GMX', name: 'GMX' },
 
   // Polygon PoS (137)
   WMATIC_POL: { chainId: 137, address: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270', decimals: 18, symbol: 'WMATIC', name: 'Wrapped MATIC' },
@@ -95,7 +94,6 @@ export const TOKENS: Record<string, TokenConfig> = {
   USDC_BASE: { chainId: 8453, address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6, symbol: 'USDC', name: 'USD Coin' },
 };
 
-// 30+ Multi-Chain Pairs Assigned to 10 Specialized Agents
 export const MULTI_CHAIN_ARBITRAGE_PAIRS: ArbitragePair[] = [
   // Agent 1: ETH Majors
   { id: 'ETH-WETH-USDC', name: 'WETH / USDC (Mainnet)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.USDC_ETH, defaultLoanAmount: '10', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 1 },
@@ -123,10 +121,10 @@ export const MULTI_CHAIN_ARBITRAGE_PAIRS: ArbitragePair[] = [
   // Agent 6: BNB & Avalanche Placeholder Swarm
   { id: 'ETH-MKR-WETH', name: 'MKR / WETH (Mainnet)', chainId: 1, tokenA: TOKENS.MKR_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '2', approxPriceUSD: 2500, cexSymbol: 'MKRUSDT', assignedAgentId: 6 },
 
-  // Agent 7: Stablecoin Pegs
-  { id: 'ETH-USDC-USDT', name: 'USDC / USDT (Mainnet Stable)', chainId: 1, tokenA: TOKENS.USDC_ETH, tokenB: TOKENS.USDT_ETH, defaultLoanAmount: '50000', approxPriceUSD: 1, cexSymbol: 'USDCUSDT', assignedAgentId: 7 },
+  // Agent 7: Stablecoin Pegs (Balanced loan sizes to avoid artificial slippage)
+  { id: 'ETH-USDC-USDT', name: 'USDC / USDT (Mainnet Stable)', chainId: 1, tokenA: TOKENS.USDC_ETH, tokenB: TOKENS.USDT_ETH, defaultLoanAmount: '2000', approxPriceUSD: 1, cexSymbol: 'USDCUSDT', assignedAgentId: 7 },
   { id: 'ETH-WETH-DAI',  name: 'WETH / DAI (Mainnet Stable)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.DAI_ETH, defaultLoanAmount: '10', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 7 },
-  { id: 'ARB-USDC-USDT', name: 'USDC / USDT (Arbitrum Stable)', chainId: 42161, tokenA: TOKENS.USDC_ARB, tokenB: TOKENS.USDT_ARB, defaultLoanAmount: '20000', approxPriceUSD: 1, cexSymbol: 'USDCUSDT', assignedAgentId: 7 },
+  { id: 'ARB-USDC-USDT', name: 'USDC / USDT (Arbitrum Stable)', chainId: 42161, tokenA: TOKENS.USDC_ARB, tokenB: TOKENS.USDT_ARB, defaultLoanAmount: '1000', approxPriceUSD: 1, cexSymbol: 'USDCUSDT', assignedAgentId: 7 },
 
   // Agent 8: Triangular Multi-Hop
   { id: 'ETH-WBTC-USDC', name: 'WBTC / USDC (Mainnet Tri)', chainId: 1, tokenA: TOKENS.WBTC_ETH, tokenB: TOKENS.USDC_ETH, defaultLoanAmount: '0.5', approxPriceUSD: 65000, cexSymbol: 'BTCUSDT', assignedAgentId: 8 },

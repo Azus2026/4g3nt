@@ -96,13 +96,43 @@ export class MultiChainExecutor {
         const activeWallet = wallet.connect(provider);
         const pendingNonce = await activeWallet.getNonce('pending');
 
-        const tx = await activeWallet.sendTransaction({
+        // Obtener datos de gas EIP-1559 en tiempo real con propina de prioridad (Priority Fee Bribing)
+        const feeData = await provider.getFeeData().catch(() => null);
+        const priorityFee = feeData?.maxPriorityFeePerGas 
+          ? (feeData.maxPriorityFeePerGas * 150n) / 100n 
+          : ethers.parseUnits(opportunity.chainId === 1 ? '2.0' : '0.1', 'gwei');
+
+        const baseFee = feeData?.maxFeePerGas || feeData?.gasPrice;
+        const maxFee = baseFee ? (baseFee * 130n) / 100n : undefined;
+
+        // Estimar Gas Límite dinámico con margen de seguridad del 25%
+        let estimatedGasLimit = opportunity.chainId === 1 ? 500000n : 350000n;
+        try {
+          const gasEst = await provider.estimateGas({
+            from: accountAddress,
+            to: toAddress,
+            data: dataHex,
+            value: valueHex,
+          });
+          estimatedGasLimit = (gasEst * 125n) / 100n;
+        } catch {
+          // Usar valor por defecto seguro si falla la estimación
+        }
+
+        const txParams: any = {
           to: toAddress,
           data: dataHex,
           value: valueHex,
           nonce: pendingNonce,
-          gasLimit: opportunity.chainId === 1 ? 500000 : 350000,
-        });
+          gasLimit: estimatedGasLimit,
+        };
+
+        if (maxFee && priorityFee) {
+          txParams.maxFeePerGas = maxFee;
+          txParams.maxPriorityFeePerGas = priorityFee;
+        }
+
+        const tx = await activeWallet.sendTransaction(txParams);
 
         logger.success(`🛡️ Transacción enviada a la blockchain! Hash: ${tx.hash}`);
         addScanLog(`🚀 [LIVE EXECUTION] Transacción transmitida. Hash: ${tx.hash}`);

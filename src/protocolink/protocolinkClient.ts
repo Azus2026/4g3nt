@@ -193,6 +193,7 @@ export class ProtocolinkClient {
           quotation = await api.protocols.uniswapv3.getSwapTokenQuotation(chainId, {
             input: { token: apiTokenIn, amount: amountIn },
             tokenOut: apiTokenOut,
+            slippage: 100,
           });
           logic = api.protocols.uniswapv3.newSwapTokenLogic(quotation);
         } catch {
@@ -202,12 +203,14 @@ export class ProtocolinkClient {
         quotation = await api.protocols.openoceanv2.getSwapTokenQuotation(chainId, {
           input: { token: apiTokenIn, amount: amountIn },
           tokenOut: apiTokenOut,
+          slippage: 100,
         }).catch(() => null);
         if (quotation) logic = api.protocols.openoceanv2.newSwapTokenLogic(quotation);
       } else if (protocolId === 'paraswap-v5') {
         quotation = await api.protocols.paraswapv5.getSwapTokenQuotation(chainId, {
           input: { token: apiTokenIn, amount: amountIn },
           tokenOut: apiTokenOut,
+          slippage: 100,
         }).catch(() => null);
         if (quotation) logic = api.protocols.paraswapv5.newSwapTokenLogic(quotation);
       }
@@ -243,6 +246,7 @@ export class ProtocolinkClient {
       const psQuote = await api.protocols.paraswapv5.getSwapTokenQuotation(chainId, {
         input: { token: apiTokenIn, amount: quote.inputAmount },
         tokenOut: apiTokenOut,
+        slippage: 100,
       }).catch(() => null);
       if (psQuote) {
         return api.protocols.paraswapv5.newSwapTokenLogic(psQuote);
@@ -251,6 +255,7 @@ export class ProtocolinkClient {
       const uniQuote = await api.protocols.uniswapv3.getSwapTokenQuotation(chainId, {
         input: { token: apiTokenIn, amount: quote.inputAmount },
         tokenOut: apiTokenOut,
+        slippage: 100,
       }).catch(() => null);
       if (uniQuote) {
         return api.protocols.uniswapv3.newSwapTokenLogic(uniQuote);

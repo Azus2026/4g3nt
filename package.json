@@ -4,9 +4,9 @@
   "description": "Multi-Chain DEX & CEX AI Flash Loan Arbitrage Bot with Liquidity Pools, Chainlist RPCs and Solidity Smart Contracts",
   "main": "dist/index.js",
   "scripts": {
-    "build": "node --max-old-space-size=460 ./node_modules/typescript/bin/tsc --skipLibCheck",
+    "build": "node --max-old-space-size=2048 ./node_modules/typescript/bin/tsc --skipLibCheck",
     "compile:contracts": "npx hardhat compile",
-    "start": "node --max-old-space-size=460 dist/src/index.js",
+    "start": "node --max-old-space-size=2048 dist/src/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "server": "ts-node src/server.ts"
   },

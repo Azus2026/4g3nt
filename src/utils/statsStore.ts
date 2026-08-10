@@ -15,11 +15,17 @@ export function loadPersistedStats(): void {
     if (fs.existsSync(STATS_FILE)) {
       const content = fs.readFileSync(STATS_FILE, 'utf-8');
       const saved = JSON.parse(content);
-      if (typeof saved.positiveOpportunitiesCount === 'number') {
-        SERVER_STATS.positiveOpportunitiesCount = saved.positiveOpportunitiesCount;
+      if (typeof saved.detectedOpportunitiesCount === 'number') {
+        SERVER_STATS.detectedOpportunitiesCount = saved.detectedOpportunitiesCount;
       }
-      if (typeof saved.totalRealizedPnLUSD === 'number') {
-        SERVER_STATS.totalRealizedPnLUSD = saved.totalRealizedPnLUSD;
+      if (typeof saved.detectedPnLUSD === 'number') {
+        SERVER_STATS.detectedPnLUSD = saved.detectedPnLUSD;
+      }
+      if (typeof saved.onChainExecutedCount === 'number') {
+        SERVER_STATS.onChainExecutedCount = saved.onChainExecutedCount;
+      }
+      if (typeof saved.onChainRealizedPnLUSD === 'number') {
+        SERVER_STATS.onChainRealizedPnLUSD = saved.onChainRealizedPnLUSD;
       }
       if (typeof saved.opportunitiesFound === 'number') {
         SERVER_STATS.opportunitiesFound = saved.opportunitiesFound;
@@ -27,7 +33,7 @@ export function loadPersistedStats(): void {
       if (typeof saved.scansCompleted === 'number') {
         SERVER_STATS.scansCompleted = saved.scansCompleted;
       }
-      logger.info(`💾 Estadísticas cargadas desde disco: ${SERVER_STATS.positiveOpportunitiesCount} arbitrajes exitosos | PnL: +$${SERVER_STATS.totalRealizedPnLUSD.toFixed(2)} USD`);
+      logger.info(`💾 Estadísticas cargadas desde disco: ${SERVER_STATS.detectedOpportunitiesCount} Oportunidades Detectadas ($${SERVER_STATS.detectedPnLUSD.toFixed(2)}) | On-Chain: ${SERVER_STATS.onChainExecutedCount} Transacciones ($${SERVER_STATS.onChainRealizedPnLUSD.toFixed(2)})`);
     }
   } catch (err: any) {
     logger.warn(`No se pudieron cargar las estadísticas guardadas: ${err.message}`);
@@ -42,8 +48,10 @@ export function savePersistedStats(): void {
     }
 
     const payload = {
-      positiveOpportunitiesCount: SERVER_STATS.positiveOpportunitiesCount,
-      totalRealizedPnLUSD: SERVER_STATS.totalRealizedPnLUSD,
+      detectedOpportunitiesCount: SERVER_STATS.detectedOpportunitiesCount,
+      detectedPnLUSD: SERVER_STATS.detectedPnLUSD,
+      onChainExecutedCount: SERVER_STATS.onChainExecutedCount,
+      onChainRealizedPnLUSD: SERVER_STATS.onChainRealizedPnLUSD,
       opportunitiesFound: SERVER_STATS.opportunitiesFound,
       scansCompleted: SERVER_STATS.scansCompleted,
       lastUpdated: new Date().toISOString(),

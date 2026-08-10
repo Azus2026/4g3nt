@@ -73,8 +73,8 @@ export class AgentWorker {
           if (evalResult.recommendation === 'EXECUTE' || evalResult.recommendation === 'SIMULATE_ONLY') {
             this.opportunitiesFound++;
             SERVER_STATS.opportunitiesFound++;
-            SERVER_STATS.positiveOpportunitiesCount++;
-            SERVER_STATS.totalRealizedPnLUSD += (opp.netProfitUSD > 0 ? opp.netProfitUSD : 0);
+            SERVER_STATS.detectedOpportunitiesCount++;
+            SERVER_STATS.detectedPnLUSD += (opp.netProfitUSD > 0 ? opp.netProfitUSD : 0);
             savePersistedStats();
             SERVER_STATS.lastOpportunities.unshift(LIVE_PAIR_RESULTS[pair.id]);
             if (SERVER_STATS.lastOpportunities.length > 20) {
@@ -82,7 +82,12 @@ export class AgentWorker {
             }
 
             this.status = 'EXECUTING';
-            await this.executor.execute(opp);
+            const executed = await this.executor.execute(opp);
+            if (executed) {
+              SERVER_STATS.onChainExecutedCount++;
+              SERVER_STATS.onChainRealizedPnLUSD += (opp.netProfitUSD > 0 ? opp.netProfitUSD : 0);
+              savePersistedStats();
+            }
           }
         } else {
           // Informar escaneo activo para pares en búsqueda de liquidez

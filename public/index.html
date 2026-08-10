@@ -243,14 +243,14 @@
         <div class="stat-sub">Consultas en Tiempo Real</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Arbitrajes Positivos</div>
-        <div class="stat-value" id="valPositiveCount" style="color: var(--accent-cyan);">0 Exitosos</div>
-        <div class="stat-sub">Alertas Ejecutadas</div>
+        <div class="stat-label">Oportunidades Detectadas</div>
+        <div class="stat-value" id="valDetectedCount" style="color: var(--accent-cyan);">0 Alertas</div>
+        <div class="stat-sub" id="valDetectedPnLUSD" style="color: var(--accent-cyan); font-weight: 600;">+$0.00 USD Teórico</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">PnL Realizado Total</div>
-        <div class="stat-value" id="valTotalPnLUSD" style="color: var(--accent-green);">$0.00 USD</div>
-        <div class="stat-sub">Ganancia Neta Acumulada</div>
+      <div class="stat-card" style="border: 1px solid rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.05);">
+        <div class="stat-label" style="color: var(--accent-green);">Ganancia Real en Billetera</div>
+        <div class="stat-value" id="valOnChainCount" style="color: var(--accent-green);">0 Tx Confirmadas</div>
+        <div class="stat-sub" id="valOnChainPnLUSD" style="color: var(--accent-green); font-weight: 700; font-size: 0.9rem;">+$0.00 USD On-Chain</div>
       </div>
     </div>
 
@@ -321,14 +321,20 @@
 
         document.getElementById('lblLiveScans').innerText = `${statusRes.stats.scansCompleted} Escaneos Vivo`;
         document.getElementById('valScansCount').innerText = statusRes.stats.scansCompleted;
-        if (document.getElementById('valPositiveCount')) {
-          document.getElementById('valPositiveCount').innerText = `${statusRes.stats.positiveOpportunitiesCount || 0} Exitosos`;
+        
+        if (document.getElementById('valDetectedCount')) {
+          document.getElementById('valDetectedCount').innerText = `${statusRes.stats.detectedOpportunitiesCount || 0} Alertas`;
         }
-        if (document.getElementById('valTotalPnLUSD')) {
-          const pnlVal = statusRes.stats.totalRealizedPnLUSD || 0;
-          const pnlEl = document.getElementById('valTotalPnLUSD');
-          pnlEl.innerText = `${pnlVal >= 0 ? '+' : ''}$${pnlVal.toFixed(2)} USD`;
-          pnlEl.style.color = pnlVal > 0 ? 'var(--accent-green)' : '#10b981';
+        if (document.getElementById('valDetectedPnLUSD')) {
+          const detPnL = statusRes.stats.detectedPnLUSD || 0;
+          document.getElementById('valDetectedPnLUSD').innerText = `+${detPnL.toFixed(2)} USD Teórico`;
+        }
+        if (document.getElementById('valOnChainCount')) {
+          document.getElementById('valOnChainCount').innerText = `${statusRes.stats.onChainExecutedCount || 0} Tx Confirmadas`;
+        }
+        if (document.getElementById('valOnChainPnLUSD')) {
+          const onChainPnL = statusRes.stats.onChainRealizedPnLUSD || 0;
+          document.getElementById('valOnChainPnLUSD').innerText = `+${onChainPnL.toFixed(2)} USD En Wallet`;
         }
 
         renderSwarm(agentsRes);

@@ -12,6 +12,15 @@ app.use(express.static(path.join(process.cwd(), 'public')));
 
 export let globalSwarmManager: SwarmManager | null = null;
 export const LIVE_PAIR_RESULTS: Record<string, any> = {};
+export const RECENT_SCAN_LOGS: string[] = [];
+
+export function addScanLog(msg: string) {
+  const timestamp = new Date().toLocaleTimeString();
+  RECENT_SCAN_LOGS.unshift(`[${timestamp}] ${msg}`);
+  if (RECENT_SCAN_LOGS.length > 50) {
+    RECENT_SCAN_LOGS.pop();
+  }
+}
 
 export function setSwarmManager(manager: SwarmManager) {
   globalSwarmManager = manager;
@@ -48,6 +57,10 @@ app.get('/api/agents', (req, res) => {
 
 app.get('/api/live-results', (req, res) => {
   res.json(LIVE_PAIR_RESULTS);
+});
+
+app.get('/api/logs', (req, res) => {
+  res.json(RECENT_SCAN_LOGS);
 });
 
 app.get('/api/chains', (req, res) => {

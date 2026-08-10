@@ -3,7 +3,7 @@ import { ArbitrageScanner } from '../agent/arbitrageScanner';
 import { AIStrategyAgent } from '../agent/aiStrategyAgent';
 import { MultiChainExecutor } from '../executor/multiChainExecutor';
 import { RPCManager } from '../providers/rpcManager';
-import { SERVER_STATS, LIVE_PAIR_RESULTS } from '../server';
+import { SERVER_STATS, LIVE_PAIR_RESULTS, addScanLog } from '../server';
 import { logger } from '../utils/logger';
 
 export interface AgentWorkerStatus {
@@ -65,7 +65,9 @@ export class AgentWorker {
           };
 
           const evalResult = this.aiAgent.evaluate(opp);
-          logger.ai(`[${this.definition.name}] Escaneo en ${opp.pairName} ($${opp.netProfitUSD.toFixed(2)} USD)`);
+          const logMsg = `[${this.definition.name}] ${opp.pairName}: Leg1 (${opp.leg1.protocolId.toUpperCase()}) ➔ Leg2 (${opp.leg2.protocolId.toUpperCase()}) | Margen Est: $${opp.netProfitUSD.toFixed(2)} USD | Gas: $${opp.estimatedGasUSD.toFixed(2)}`;
+          logger.ai(logMsg);
+          addScanLog(logMsg);
 
           if (evalResult.recommendation === 'EXECUTE' || evalResult.recommendation === 'SIMULATE_ONLY') {
             this.opportunitiesFound++;
@@ -79,7 +81,7 @@ export class AgentWorker {
             await this.executor.execute(opp);
           }
         } else {
-          // Si no hay respuesta de cotización en esta ronda, marcar en búsqueda sin poner 0.00
+          // Informar escaneo activo para pares en búsqueda de liquidez
           LIVE_PAIR_RESULTS[pair.id] = {
             timestamp: new Date().toISOString(),
             agentId: this.definition.id,
@@ -94,6 +96,7 @@ export class AgentWorker {
             estimatedGasUSD: 0,
             isProfitable: false,
           };
+          addScanLog(`[${this.definition.name}] Escaneando ${pair.name}... (Consultando bloques on-chain)`);
         }
       }
     } catch (err: any) {

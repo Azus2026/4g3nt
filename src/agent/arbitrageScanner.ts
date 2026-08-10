@@ -7,7 +7,7 @@ import { logger } from '../utils/logger';
 export class ArbitrageScanner {
   private client: ProtocolinkClient;
   private cexFetcher: CEXFetcher;
-  private supportedProtocols = ['uniswap-v3', 'openocean-v2', 'paraswap-v5', 'zeroex-v4'];
+  private supportedProtocols = ['uniswap-v3-0.05%', 'uniswap-v3-0.3%', 'uniswap-v3-1%', 'paraswap-v5', 'openocean-v2'];
 
   constructor() {
     this.client = new ProtocolinkClient();
@@ -20,25 +20,25 @@ export class ArbitrageScanner {
   async scanPair(pair: ArbitragePair): Promise<ArbitrageOpportunity | null> {
     const { tokenA, tokenB, defaultLoanAmount, approxPriceUSD, chainId, cexSymbol } = pair;
 
-    // 1. Obtener cotizaciones para la Leg 1 (TokenA -> TokenB)
+    // 1. Obtener cotizaciones para la Leg 1 (TokenA -> TokenB) con captura individual de errores
     const leg1QuotesPromises = this.supportedProtocols.map(proto =>
-      this.client.getSwapQuotation(proto, chainId, tokenA, tokenB, defaultLoanAmount)
+      this.client.getSwapQuotation(proto, chainId, tokenA, tokenB, defaultLoanAmount).catch(() => null)
     );
     const leg1QuotesRaw = await Promise.all(leg1QuotesPromises);
-    const leg1Quotes = leg1QuotesRaw.filter((q): q is DEXQuote => q !== null);
+    const leg1Quotes = leg1QuotesRaw.filter((q): q is DEXQuote => q !== null && parseFloat(q.outputAmount) > 0);
 
     if (leg1Quotes.length === 0) return null;
 
     leg1Quotes.sort((a, b) => parseFloat(b.outputAmount) - parseFloat(a.outputAmount));
     const bestLeg1 = leg1Quotes[0];
 
-    // 2. Obtener cotizaciones para la Leg 2 (TokenB -> TokenA)
-    const leg2QuotesPromises = this.supportedProtocols
-      .filter(proto => proto !== bestLeg1.protocolId)
-      .map(proto => this.client.getSwapQuotation(proto, chainId, tokenB, tokenA, bestLeg1.outputAmount));
+    // 2. Obtener cotizaciones para la Leg 2 (TokenB -> TokenA) con captura individual de errores
+    const leg2QuotesPromises = this.supportedProtocols.map(proto =>
+      this.client.getSwapQuotation(proto, chainId, tokenB, tokenA, bestLeg1.outputAmount).catch(() => null)
+    );
 
     const leg2QuotesRaw = await Promise.all(leg2QuotesPromises);
-    const leg2Quotes = leg2QuotesRaw.filter((q): q is DEXQuote => q !== null);
+    const leg2Quotes = leg2QuotesRaw.filter((q): q is DEXQuote => q !== null && parseFloat(q.outputAmount) > 0);
 
     if (leg2Quotes.length === 0) return null;
 
@@ -50,10 +50,9 @@ export class ArbitrageScanner {
     let cexSpreadPercent: number | undefined;
 
     if (cexSymbol) {
-      const cexInfo = await this.cexFetcher.getAggregatedCEXPrice(cexSymbol);
+      const cexInfo = await this.cexFetcher.getAggregatedCEXPrice(cexSymbol).catch(() => ({ avgPrice: 0 }));
       if (cexInfo.avgPrice > 0) {
         cexAvgPriceUSD = cexInfo.avgPrice;
-        // Calcular la dispersión entre el precio del DEX Leg1 y el CEX
         const dexImpliedPrice = (parseFloat(defaultLoanAmount) * approxPriceUSD) / parseFloat(bestLeg1.outputAmount);
         cexSpreadPercent = Math.abs(((dexImpliedPrice - cexAvgPriceUSD) / cexAvgPriceUSD) * 100);
       }

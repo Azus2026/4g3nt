@@ -75,13 +75,14 @@ export class ProtocolinkClient {
   }
 
   /**
-   * Consulta cotización On-Chain directa usando el Quoter de Uniswap V3 (100% confiable sin bloqueos HTTP)
+   * Consulta cotización On-Chain directa usando el Quoter de Uniswap V3 para una tasa de comisión específica
    */
   async getOnChainUniswapV3Quote(
     chainId: number,
     tokenIn: TokenConfig,
     tokenOut: TokenConfig,
-    amountIn: string
+    amountIn: string,
+    feeTier: number = 500
   ): Promise<DEXQuote | null> {
     const quoterAddress = UNISWAP_V3_QUOTER_ADDRESSES[chainId];
     const rpcUrl = RPC_FALLBACKS[chainId];
@@ -90,21 +91,21 @@ export class ProtocolinkClient {
     try {
       const provider = new ethers.JsonRpcProvider(rpcUrl, chainId, { staticNetwork: true });
       const quoter = new ethers.Contract(quoterAddress, UNISWAP_V3_QUOTER_ABI, provider);
-
       const parsedAmountIn = ethers.parseUnits(amountIn, tokenIn.decimals);
       
-      // Probar tier de fee 3000 (0.3%) y luego 500 (0.05%)
-      let amountOut: bigint;
-      try {
-        amountOut = await quoter.quoteExactInputSingle.staticCall(tokenIn.address, tokenOut.address, 3000, parsedAmountIn, 0);
-      } catch {
-        amountOut = await quoter.quoteExactInputSingle.staticCall(tokenIn.address, tokenOut.address, 500, parsedAmountIn, 0);
-      }
+      const amountOut = await quoter.quoteExactInputSingle.staticCall(
+        tokenIn.address,
+        tokenOut.address,
+        feeTier,
+        parsedAmountIn,
+        0
+      );
 
       const formattedOut = ethers.formatUnits(amountOut, tokenOut.decimals);
+      const feePercent = feeTier === 500 ? '0.05%' : (feeTier === 3000 ? '0.3%' : '1%');
 
       return {
-        protocolId: 'uniswap-v3',
+        protocolId: `uniswap-v3-${feePercent}`,
         chainId,
         inputToken: tokenIn,
         outputToken: tokenOut,
@@ -118,7 +119,7 @@ export class ProtocolinkClient {
   }
 
   /**
-   * Consulta cotizaciones de Swap en DEXs por cadena (híbrido API Protocolink + On-Chain Directo)
+   * Consulta cotizaciones de Swap en DEXs por cadena (Resistente a fallos con retorno individual seguro)
    */
   async getSwapQuotation(
     protocolId: string,
@@ -128,6 +129,14 @@ export class ProtocolinkClient {
     amountIn: string
   ): Promise<DEXQuote | null> {
     try {
+      if (protocolId === 'uniswap-v3-0.05%') {
+        return await this.getOnChainUniswapV3Quote(chainId, tokenIn, tokenOut, amountIn, 500);
+      } else if (protocolId === 'uniswap-v3-0.3%') {
+        return await this.getOnChainUniswapV3Quote(chainId, tokenIn, tokenOut, amountIn, 3000);
+      } else if (protocolId === 'uniswap-v3-1%') {
+        return await this.getOnChainUniswapV3Quote(chainId, tokenIn, tokenOut, amountIn, 10000);
+      }
+
       let quotation: any = null;
       let logic: any = null;
 
@@ -139,28 +148,27 @@ export class ProtocolinkClient {
           });
           logic = api.protocols.uniswapv3.newSwapTokenLogic(quotation);
         } catch {
-          // Si la API falla (ej. 403 Forbidden), recurrir al Quoter On-Chain directo de Uniswap V3
-          return await this.getOnChainUniswapV3Quote(chainId, tokenIn, tokenOut, amountIn);
+          return await this.getOnChainUniswapV3Quote(chainId, tokenIn, tokenOut, amountIn, 500);
         }
       } else if (protocolId === 'openocean-v2') {
         quotation = await api.protocols.openoceanv2.getSwapTokenQuotation(chainId, {
           input: { token: tokenIn, amount: amountIn },
           tokenOut: tokenOut,
-        });
-        logic = api.protocols.openoceanv2.newSwapTokenLogic(quotation);
+        }).catch(() => null);
+        if (quotation) logic = api.protocols.openoceanv2.newSwapTokenLogic(quotation);
       } else if (protocolId === 'paraswap-v5') {
         quotation = await api.protocols.paraswapv5.getSwapTokenQuotation(chainId, {
           input: { token: tokenIn, amount: amountIn },
           tokenOut: tokenOut,
-        });
-        logic = api.protocols.paraswapv5.newSwapTokenLogic(quotation);
+        }).catch(() => null);
+        if (quotation) logic = api.protocols.paraswapv5.newSwapTokenLogic(quotation);
       } else if (protocolId === 'zeroex-v4') {
         quotation = await api.protocols.zeroexv4.getSwapTokenQuotation(chainId, {
           input: { token: tokenIn, amount: amountIn },
           tokenOut: tokenOut,
           apiKey: '',
-        });
-        logic = api.protocols.zeroexv4.newSwapTokenLogic(quotation);
+        }).catch(() => null);
+        if (quotation) logic = api.protocols.zeroexv4.newSwapTokenLogic(quotation);
       }
 
       if (quotation && quotation.output && quotation.output.amount) {
@@ -175,12 +183,7 @@ export class ProtocolinkClient {
         };
       }
     } catch (error: any) {
-      // Ignorar rutas sin liquidez o con error de API
-    }
-
-    // Fallback final on-chain para Uniswap V3 si protocolId es uniswap-v3
-    if (protocolId === 'uniswap-v3') {
-      return await this.getOnChainUniswapV3Quote(chainId, tokenIn, tokenOut, amountIn);
+      // Ignorar errores de ruta sin lanzar excepción
     }
 
     return null;

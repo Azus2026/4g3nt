@@ -222,6 +222,35 @@ export class ProtocolinkClient {
   }
 
   /**
+   * Genera un objeto de lógica de Protocolink válido cuando un quoter custom retorne logic: null
+   */
+  async getProtocolinkLogic(chainId: number, quote: DEXQuote) {
+    if (quote.logic) return quote.logic;
+
+    try {
+      const psQuote = await api.protocols.paraswapv5.getSwapTokenQuotation(chainId, {
+        input: { token: quote.inputToken, amount: quote.inputAmount },
+        tokenOut: quote.outputToken,
+      }).catch(() => null);
+      if (psQuote) {
+        return api.protocols.paraswapv5.newSwapTokenLogic(psQuote);
+      }
+
+      const uniQuote = await api.protocols.uniswapv3.getSwapTokenQuotation(chainId, {
+        input: { token: quote.inputToken, amount: quote.inputAmount },
+        tokenOut: quote.outputToken,
+      }).catch(() => null);
+      if (uniQuote) {
+        return api.protocols.uniswapv3.newSwapTokenLogic(uniQuote);
+      }
+    } catch {
+      // Ignorar fallback errors
+    }
+
+    return null;
+  }
+
+  /**
    * Construye el paquete de transacción atómica del Router
    */
   async buildArbitrageTransaction(
@@ -234,10 +263,18 @@ export class ProtocolinkClient {
   ) {
     const [flashLoanLoanLogic, flashLoanRepayLogic] = await this.getFlashLoanPair(flashLoanToken, flashLoanAmount, chainId);
 
+    const logic1 = leg1.logic || await this.getProtocolinkLogic(chainId, leg1);
+    const logic2 = leg2.logic || await this.getProtocolinkLogic(chainId, leg2);
+
+    if (!logic1 || !logic2) {
+      logger.warn(`No se pudo generar la lógica del Router para ${leg1.protocolId} / ${leg2.protocolId}`);
+      return { logics: [], routerData: null };
+    }
+
     const logics = [
       flashLoanLoanLogic,
-      leg1.logic,
-      leg2.logic,
+      logic1,
+      logic2,
       flashLoanRepayLogic,
     ];
 

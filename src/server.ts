@@ -52,6 +52,7 @@ app.get('/api/status', (req, res) => {
 /**
  * Webhook Receptor en tiempo real para QuickNode Streams (< 5ms)
  * Soporta eventos Swap de Ballenas (> $50k USD), De-peg Streams y Burn Events
+ * Garantiza respuesta HTTP 200 OK para pings y verificaciones de QuickNode
  */
 app.post('/api/mempool-stream', (req, res) => {
   try {
@@ -61,10 +62,11 @@ app.post('/api/mempool-stream', (req, res) => {
       addScanLog(`⚡ [QUICKNODE STREAM] Evento ${payload.eventType} recibido para ${payload.pairName || 'Pool'}`);
       return res.status(200).json({ success: true, processed: true });
     }
-    return res.status(400).json({ success: false, error: 'Payload inválido' });
+    // Respuesta HTTP 200 garantizada para verificaciones iniciales de QuickNode
+    return res.status(200).json({ success: true, status: 'CONNECTED' });
   } catch (err: any) {
     logger.warn(`Error al procesar payload de QuickNode Stream: ${err.message}`);
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(200).json({ success: true, status: 'CONNECTED' });
   }
 });
 

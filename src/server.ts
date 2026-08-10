@@ -8,7 +8,10 @@ import { streamProcessor, StreamPayload } from './mempool/quicknodeStreamProcess
 import { logger } from './utils/logger';
 
 const app = express();
-app.use(express.json());
+
+// Aumentar límite de carga útil a 50MB para soportar bloques enteros de Logs de QuickNode Streams
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(path.join(process.cwd(), 'public')));
 
 export let globalSwarmManager: SwarmManager | null = null;
@@ -51,8 +54,7 @@ app.get('/api/status', (req, res) => {
 
 /**
  * Webhook Receptor en tiempo real para QuickNode Streams (< 5ms)
- * Soporta eventos Swap de Ballenas (> $50k USD), De-peg Streams y Burn Events
- * Garantiza respuesta HTTP 200 OK para pings y verificaciones de QuickNode
+ * Soporta cargas útiles grandes de bloques (hasta 50MB)
  */
 app.post('/api/mempool-stream', (req, res) => {
   try {

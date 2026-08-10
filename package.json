@@ -1,0 +1,49 @@
+{
+  "name": "flashloan-arbitrage-agent-v2",
+  "version": "2.0.0",
+  "description": "Multi-Chain DEX & CEX AI Flash Loan Arbitrage Bot with Liquidity Pools, Chainlist RPCs and Solidity Smart Contracts",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "compile:contracts": "hardhat compile",
+    "start": "ts-node src/index.ts",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "server": "ts-node src/server.ts"
+  },
+  "keywords": [
+    "arbitrage",
+    "flashloan",
+    "mev",
+    "multi-chain",
+    "dex",
+    "cex",
+    "solidity",
+    "uniswap",
+    "aave",
+    "protocolink"
+  ],
+  "author": "Antigravity AI Agent",
+  "license": "MIT",
+  "dependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts": "^5.0.2",
+    "@protocolink/api": "^1.4.8",
+    "@protocolink/common": "^0.5.5",
+    "@protocolink/logics": "^1.8.9",
+    "axios": "^1.7.2",
+    "chalk": "^4.1.2",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.2",
+    "express": "^4.22.2",
+    "hardhat": "^2.22.5",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.25",
+    "@types/lodash": "^4.17.5",
+    "@types/node": "^20.14.9",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.5.2"
+  }
+}

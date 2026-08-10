@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Protocolink AI Flash Loan Arbitrage V2 | 10-Agent Swarm Command Center</title>
+
+  <!-- Google Fonts & Lucide Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    :root {
+      --bg-main: #0a0d14;
+      --bg-card: #121824;
+      --bg-card-hover: #182030;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #00f2fe;
+      --accent-blue: #4facfe;
+      --accent-purple: #7f00ff;
+      --accent-green: #10b981;
+      --accent-yellow: #f59e0b;
+      --accent-red: #ef4444;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(0, 242, 254, 0.05) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(127, 0, 255, 0.05) 0%, transparent 40%);
+    }
+
+    header {
+      background: rgba(18, 24, 36, 0.8);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand { display: flex; align-items: center; gap: 0.75rem; }
+
+    .brand-icon {
+      width: 42px; height: 42px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; box-shadow: 0 0 20px rgba(0, 242, 254, 0.3);
+    }
+
+    .brand-title {
+      font-family: 'Outfit', sans-serif; font-size: 1.35rem; font-weight: 700;
+      background: linear-gradient(to right, #fff, #94a3b8);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+
+    .brand-subtitle {
+      font-size: 0.75rem; color: var(--accent-cyan);
+      text-transform: uppercase; letter-spacing: 1px; font-weight: 600;
+    }
+
+    .header-badges { display: flex; align-items: center; gap: 0.75rem; }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.75rem;
+      font-weight: 600; border: 1px solid var(--border-color);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .badge-green {
+      background: rgba(16, 185, 129, 0.15); color: var(--accent-green);
+      border-color: rgba(16, 185, 129, 0.4); box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+    }
+
+    .container {
+      max-width: 1440px; margin: 0 auto; padding: 2rem;
+      width: 100%; display: flex; flex-direction: column; gap: 2rem;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem;
+    }
+
+    .stat-card {
+      background: var(--bg-card); border: 1px solid var(--border-color);
+      border-radius: 16px; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.5rem;
+    }
+
+    .stat-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; }
+    .stat-value { font-family: 'Outfit', sans-serif; font-size: 1.75rem; font-weight: 700; color: #fff; }
+    .stat-sub { font-size: 0.75rem; color: var(--text-muted); }
+
+    /* Swarm Grid */
+    .swarm-section-title {
+      font-family: 'Outfit', sans-serif; font-size: 1.35rem; font-weight: 700;
+      margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;
+    }
+
+    .swarm-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.25rem;
+    }
+
+    .agent-card {
+      background: var(--bg-card); border: 1px solid var(--border-color);
+      border-radius: 16px; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem;
+      position: relative; overflow: hidden; transition: transform 0.2s ease;
+    }
+
+    .agent-card:hover { transform: translateY(-2px); border-color: rgba(0, 242, 254, 0.3); }
+
+    .agent-header { display: flex; justify-content: space-between; align-items: center; }
+    .agent-name { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1rem; }
+    .agent-role { font-size: 0.75rem; color: var(--text-muted); }
+
+    .agent-status-pill {
+      font-size: 0.65rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 6px;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    .status-idle { background: rgba(148, 163, 184, 0.1); color: #94a3b8; }
+    .status-scanning { background: rgba(0, 242, 254, 0.15); color: var(--accent-cyan); border: 1px solid rgba(0, 242, 254, 0.3); }
+    .status-executing { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.4); }
+
+    .agent-stats-row {
+      display: flex; justify-content: space-between; font-size: 0.75rem;
+      background: rgba(255, 255, 255, 0.02); padding: 0.5rem 0.8rem; border-radius: 10px;
+    }
+
+    /* Pairs Grid */
+    .pairs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.5rem; }
+
+    .pair-card {
+      background: var(--bg-card); border: 1px solid var(--border-color);
+      border-radius: 18px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;
+    }
+
+    .pair-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .pair-name { font-family: 'Outfit', sans-serif; font-size: 1.15rem; font-weight: 700; }
+    .pair-route {
+      background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);
+      border-radius: 12px; padding: 0.8rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem;
+    }
+
+    .profit-box {
+      background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2);
+      border-radius: 12px; padding: 0.8rem; display: flex; justify-content: space-between; align-items: center;
+    }
+
+    .profit-box.positive { background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.3); }
+    .profit-val { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1.1rem; color: var(--accent-red); }
+    .profit-box.positive .profit-val { color: var(--accent-green); }
+
+    .ai-tag { padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.7rem; font-weight: 700; }
+    .tag-skip { background: rgba(148, 163, 184, 0.1); color: #94a3b8; }
+    .tag-execute { background: rgba(16, 185, 129, 0.25); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.5); }
+
+    .contract-banner {
+      background: linear-gradient(135deg, rgba(18, 24, 36, 0.9), rgba(24, 32, 48, 0.9));
+      border: 1px solid var(--border-color); border-radius: 18px; padding: 1.5rem 2rem;
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
+    }
+
+    .pulse-dot {
+      width: 8px; height: 8px; border-radius: 50%; background-color: var(--accent-green);
+      display: inline-block; box-shadow: 0 0 10px var(--accent-green);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.2); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon"><i data-lucide="cpu"></i></div>
+      <div>
+        <div class="brand-title">Protocolink 10-Agent Swarm V2</div>
+        <div class="brand-subtitle">Distributed Multi-Agent Arbitrage Cluster</div>
+      </div>
+    </div>
+
+    <div class="header-badges">
+      <div class="badge badge-green" id="badgeMode">
+        <i data-lucide="zap" style="width: 14px;"></i> MODO REAL (10 AGENTES ACTIVOS)
+      </div>
+      <div class="badge" style="background: rgba(127, 0, 255, 0.15); color: var(--accent-purple); border-color: rgba(127, 0, 255, 0.4);">
+        <span class="pulse-dot"></span> <span id="lblLiveScans">0 Escaneos Realizados</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- Stats Grid -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Cluster Swarm</div>
+        <div class="stat-value" id="valAgents">10 Agentes</div>
+        <div class="stat-sub">Multi-Hilo Concurrente</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Cadenas de Red</div>
+        <div class="stat-value">7 Chains</div>
+        <div class="stat-sub">ETH, ARB, OP, POL, BASE, BSC, AVAX</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Escaneos Totales</div>
+        <div class="stat-value" id="valScansCount">0</div>
+        <div class="stat-sub">Consultas en Tiempo Real</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Filtro de Ganancia</div>
+        <div class="stat-value">$5.00 USD</div>
+        <div class="stat-sub">Seguridad IA Swarm</div>
+      </div>
+    </div>
+
+    <!-- Swarm Grid -->
+    <div>
+      <div class="swarm-section-title">
+        <i data-lucide="bot" style="color: var(--accent-cyan);"></i> Estado de los 10 Agentes en Tiempo Real
+      </div>
+      <div class="swarm-grid" id="swarmGrid">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+    <!-- Pairs Grid -->
+    <div>
+      <div class="swarm-section-title" style="margin-top: 1rem;">
+        <i data-lucide="layers" style="color: var(--accent-cyan);"></i> Escaneo Dinámico en Vivo por Par
+      </div>
+      <div class="pairs-grid" id="pairsGrid">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+    <!-- Contract Banner -->
+    <div class="contract-banner">
+      <div>
+        <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 0.25rem;">Contrato Inteligente FlashLoanArbitrageReceiver.sol</h3>
+        <p style="font-size: 0.8rem; color: var(--text-muted);">Ejecución atómica multihilo • ReentrancyGuard • Reversión automática sin pérdida de capital</p>
+      </div>
+      <div class="badge badge-green">
+        <i data-lucide="shield-check" style="width: 14px;"></i> Cluster en Red Real
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    async function updateDashboard() {
+      try {
+        const [agentsRes, liveRes, pairsRes, statusRes] = await Promise.all([
+          fetch('/api/agents').then(r => r.json()),
+          fetch('/api/live-results').then(r => r.json()),
+          fetch('/api/pairs').then(r => r.json()),
+          fetch('/api/status').then(r => r.json()),
+        ]);
+
+        const badgeMode = document.getElementById('badgeMode');
+        if (!statusRes.dryRun) {
+          badgeMode.className = 'badge badge-green';
+          badgeMode.innerHTML = '<i data-lucide="zap" style="width: 14px;"></i> MODO REAL (10 AGENTES ACTIVOS)';
+        } else {
+          badgeMode.className = 'badge badge-yellow';
+          badgeMode.innerHTML = '<i data-lucide="flask-conical" style="width: 14px;"></i> DRY-RUN (10 AGENTES SIMULACIÓN)';
+        }
+
+        document.getElementById('lblLiveScans').innerText = `${statusRes.stats.scansCompleted} Escaneos Vivo`;
+        document.getElementById('valScansCount').innerText = statusRes.stats.scansCompleted;
+
+        renderSwarm(agentsRes);
+        renderPairs(pairsRes, liveRes, statusRes.dryRun);
+        lucide.createIcons();
+      } catch (err) {
+        console.error("Error updating dashboard:", err);
+      }
+    }
+
+    function renderSwarm(agents) {
+      const grid = document.getElementById('swarmGrid');
+      grid.innerHTML = '';
+
+      agents.forEach(agent => {
+        const card = document.createElement('div');
+        card.className = 'agent-card';
+        card.style.borderTop = `3px solid ${agent.color || '#00f2fe'}`;
+
+        const statusClass = agent.status === 'SCANNING' ? 'status-scanning' : (agent.status === 'EXECUTING' ? 'status-executing' : 'status-idle');
+
+        card.innerHTML = `
+          <div class="agent-header">
+            <div class="agent-name">${agent.name}</div>
+            <div class="agent-status-pill ${statusClass}">${agent.status || 'SCANNING'}</div>
+          </div>
+          <div class="agent-role">${agent.role}</div>
+          <div class="agent-stats-row">
+            <div>Pares: <strong>${agent.assignedPairsCount || 0}</strong></div>
+            <div>Escaneos: <strong>${agent.scansCount || 0}</strong></div>
+            <div>Alertas: <strong>${agent.opportunitiesFound || 0}</strong></div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function renderPairs(pairs, liveRes, isDryRun) {
+      const grid = document.getElementById('pairsGrid');
+      grid.innerHTML = '';
+
+      pairs.forEach(pair => {
+        const opp = liveRes[pair.id];
+        const leg1Proto = opp ? opp.leg1.protocolId.toUpperCase() : 'ESCANANDO...';
+        const leg2Proto = opp ? opp.leg2.protocolId.toUpperCase() : 'ESCANANDO...';
+        const netProfit = opp ? opp.netProfitUSD : null;
+        const isProfitable = opp ? opp.isProfitable : false;
+        const gasCost = opp ? opp.estimatedGasUSD.toFixed(2) : '0.00';
+        const cexPrice = opp && opp.cexReferencePriceUSD ? `$${opp.cexReferencePriceUSD.toFixed(2)}` : null;
+
+        const card = document.createElement('div');
+        card.className = 'pair-card';
+
+        let profitHtml = '';
+        if (netProfit !== null) {
+          profitHtml = `<div class="profit-val">${netProfit >= 0 ? '+' : ''}$${netProfit.toFixed(2)} USD</div>`;
+        } else {
+          profitHtml = `<div class="profit-val" style="color: var(--text-muted);">Calculando...</div>`;
+        }
+
+        let cexHtml = cexPrice ? `<div style="font-size: 0.7rem; color: var(--accent-cyan); font-weight: 600;">CEX Ticker: ${cexPrice}</div>` : '';
+
+        card.innerHTML = `
+          <div class="pair-header">
+            <div>
+              <div class="pair-name">${pair.name}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">Agente #${pair.assignedAgentId} | Préstamo: ${pair.defaultLoanAmount} ${pair.tokenA.symbol}</div>
+            </div>
+            ${cexHtml}
+          </div>
+          <div class="pair-route">
+            <div><span style="color: var(--accent-cyan); font-weight: 700;">${leg1Proto}</span> ➔</div>
+            <div>➔ <span style="color: var(--accent-cyan); font-weight: 700;">${leg2Proto}</span></div>
+          </div>
+          <div class="profit-box ${isProfitable ? 'positive' : ''}">
+            <div>
+              <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Ganancia Est. (Gas $${gasCost})</div>
+              ${profitHtml}
+            </div>
+            <div class="ai-tag ${isProfitable ? 'tag-execute' : 'tag-skip'}">
+              ${isProfitable ? (isDryRun ? '🧪 SIMULAR' : '🚀 EJECUTAR REAL') : '⏸️ OMITIR'}
+            </div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    updateDashboard();
+    setInterval(updateDashboard, 2000);
+  </script>
+</body>
+</html>

@@ -84,12 +84,34 @@ export class RPCManager {
   }
 
   /**
-   * Prueba latencia y selecciona el mejor RPC para una cadena dada
+   * Prueba latencia y selecciona el mejor RPC para una cadena dada (Prioridad Absoluta a Nodos Privados)
    */
   async benchmarkAndSelectBestRPC(chainId: number): Promise<ethers.JsonRpcProvider> {
     const chain = SUPPORTED_CHAINS[chainId];
     if (!chain) {
       throw new Error(`ChainID ${chainId} no soportada.`);
+    }
+
+    // Si hay una URL privada dedicada configurada en .env (ej. QuickNode / Infura / Alchemy), usarla directamente
+    const primaryEnvUrl = chain.defaultRpcUrls[0];
+    if (primaryEnvUrl && (primaryEnvUrl.includes('quiknode') || primaryEnvUrl.includes('infura') || primaryEnvUrl.includes('alchemy'))) {
+      try {
+        const start = Date.now();
+        const dedicatedProvider = new ethers.JsonRpcProvider(primaryEnvUrl, chainId, { staticNetwork: true });
+        await dedicatedProvider.getBlockNumber();
+        const latencyMs = Date.now() - start;
+        const dedicatedRpc: ActiveRPC = {
+          chainId,
+          url: primaryEnvUrl,
+          latencyMs,
+          provider: dedicatedProvider,
+        };
+        this.activeProviders.set(chainId, dedicatedRpc);
+        logger.rpc(`⚡ [Chain ${chainId} - ${chain.name}] Nodo Privado QuickNode Seleccionado: ${primaryEnvUrl.slice(0, 55)}... (${latencyMs}ms)`);
+        return dedicatedProvider;
+      } catch {
+        // Fallback si la llave privada falla
+      }
     }
 
     const candidateUrls = [
@@ -106,11 +128,7 @@ export class RPCManager {
         await testProvider.getBlockNumber();
         const latencyMs = Date.now() - start;
 
-        // Si la URL contiene quicknode o infura o alchemy, darle prioridad extrema
-        const isDedicated = url.includes('quiknode') || url.includes('infura') || url.includes('alchemy');
-        const adjustedLatency = isDedicated ? latencyMs / 10 : latencyMs;
-
-        if (!bestRpc || adjustedLatency < bestRpc.latencyMs) {
+        if (!bestRpc || latencyMs < bestRpc.latencyMs) {
           bestRpc = {
             chainId,
             url,

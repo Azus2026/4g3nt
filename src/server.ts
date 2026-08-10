@@ -4,6 +4,7 @@ import { ENV } from './config/env';
 import { MULTI_CHAIN_ARBITRAGE_PAIRS, DEX_PROTOCOLS, SWARM_AGENTS } from './config/registry';
 import { SUPPORTED_CHAINS } from './config/chains';
 import { SwarmManager } from './cluster/swarmManager';
+import { streamProcessor, StreamPayload } from './mempool/quicknodeStreamProcessor';
 import { logger } from './utils/logger';
 
 const app = express();
@@ -24,6 +25,7 @@ export function addScanLog(msg: string) {
 
 export function setSwarmManager(manager: SwarmManager) {
   globalSwarmManager = manager;
+  streamProcessor.setSwarmManager(manager);
 }
 
 // In-memory stats store
@@ -45,6 +47,25 @@ app.get('/api/status', (req, res) => {
     minProfitUSD: ENV.minProfitUSD,
     stats: SERVER_STATS,
   });
+});
+
+/**
+ * Webhook Receptor en tiempo real para QuickNode Streams (< 5ms)
+ * Soporta eventos Swap de Ballenas (> $50k USD), De-peg Streams y Burn Events
+ */
+app.post('/api/mempool-stream', (req, res) => {
+  try {
+    const payload: StreamPayload = req.body;
+    if (payload && payload.eventType) {
+      streamProcessor.processStreamEvent(payload);
+      addScanLog(`⚡ [QUICKNODE STREAM] Evento ${payload.eventType} recibido para ${payload.pairName || 'Pool'}`);
+      return res.status(200).json({ success: true, processed: true });
+    }
+    return res.status(400).json({ success: false, error: 'Payload inválido' });
+  } catch (err: any) {
+    logger.warn(`Error al procesar payload de QuickNode Stream: ${err.message}`);
+    return res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.get('/api/agents', (req, res) => {
@@ -83,7 +104,7 @@ export function startServer(initialPort: number = ENV.port) {
   const server = app.listen(initialPort, () => {
     logger.info(`🌐 Servidor de monitoreo V2 ejecutándose en http://localhost:${initialPort}`);
     logger.info(`   -> Dashboard Web: http://localhost:${initialPort}`);
-    logger.info(`   -> Endpoint Resultados en Vivo: http://localhost:${initialPort}/api/live-results`);
+    logger.info(`   -> Endpoint Webhook QuickNode Streams: http://localhost:${initialPort}/api/mempool-stream`);
   });
 
   server.on('error', (err: any) => {

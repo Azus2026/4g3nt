@@ -27,6 +27,20 @@ export class SwarmManager {
     });
   }
 
+  /**
+   * Dispara un escaneo de alta prioridad instantáneo impulsado por QuickNode Webhook Streams (< 5ms)
+   */
+  async triggerPriorityScan(pairId: string): Promise<void> {
+    const targetPair = MULTI_CHAIN_ARBITRAGE_PAIRS.find(p => p.id === pairId);
+    if (!targetPair) return;
+
+    const worker = this.workers.get(targetPair.assignedAgentId);
+    if (worker) {
+      logger.rpc(`⚡ [STREAM PRIORITY TRIGGER] Disparando escaneo atómico prioritario para ${targetPair.name}...`);
+      await worker.runScanCycle().catch(() => {});
+    }
+  }
+
   async startSwarmLoop() {
     logger.success('🔥 Cluster de 10 Agentes activado. Escaneo concurrente multi-hilo iniciado.');
 

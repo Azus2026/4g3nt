@@ -206,7 +206,7 @@
         <i data-lucide="zap" style="width: 14px;"></i> MODO REAL (10 AGENTES ACTIVOS)
       </div>
       <div class="badge" style="background: rgba(127, 0, 255, 0.15); color: var(--accent-purple); border-color: rgba(127, 0, 255, 0.4);">
-        <span class="pulse-dot"></span> <span id="lblLiveScans">0 Escaneos Realizados</span>
+        <span class="pulse-dot"></span> <span id="lblLiveScans">0 Escaneos Vivo</span>
       </div>
     </div>
   </header>
@@ -335,11 +335,11 @@
 
       pairs.forEach(pair => {
         const opp = liveRes[pair.id];
-        const leg1Proto = opp ? opp.leg1.protocolId.toUpperCase() : 'ESCANANDO...';
-        const leg2Proto = opp ? opp.leg2.protocolId.toUpperCase() : 'ESCANANDO...';
-        const netProfit = opp ? opp.netProfitUSD : null;
+        const leg1Proto = opp && opp.leg1 ? opp.leg1.protocolId.toUpperCase() : 'BUSCANDO...';
+        const leg2Proto = opp && opp.leg2 ? opp.leg2.protocolId.toUpperCase() : 'BUSCANDO...';
+        const netProfit = (opp && typeof opp.netProfitUSD === 'number') ? opp.netProfitUSD : null;
         const isProfitable = opp ? opp.isProfitable : false;
-        const gasCost = opp ? opp.estimatedGasUSD.toFixed(2) : '0.00';
+        const gasCost = opp && typeof opp.estimatedGasUSD === 'number' ? opp.estimatedGasUSD.toFixed(2) : '0.00';
         const cexPrice = opp && opp.cexReferencePriceUSD ? `$${opp.cexReferencePriceUSD.toFixed(2)}` : null;
 
         const card = document.createElement('div');
@@ -349,7 +349,7 @@
         if (netProfit !== null) {
           profitHtml = `<div class="profit-val">${netProfit >= 0 ? '+' : ''}$${netProfit.toFixed(2)} USD</div>`;
         } else {
-          profitHtml = `<div class="profit-val" style="color: var(--text-muted);">Calculando...</div>`;
+          profitHtml = `<div class="profit-val" style="color: var(--text-muted); font-size: 0.9rem;">Buscando liquidez...</div>`;
         }
 
         let cexHtml = cexPrice ? `<div style="font-size: 0.7rem; color: var(--accent-cyan); font-weight: 600;">CEX Ticker: ${cexPrice}</div>` : '';
@@ -372,7 +372,7 @@
               ${profitHtml}
             </div>
             <div class="ai-tag ${isProfitable ? 'tag-execute' : 'tag-skip'}">
-              ${isProfitable ? (isDryRun ? '🧪 SIMULAR' : '🚀 EJECUTAR REAL') : '⏸️ OMITIR'}
+              ${isProfitable ? (isDryRun ? '🧪 SIMULAR' : '🚀 EJECUTAR REAL') : 'OMITIR'}
             </div>
           </div>
         `;

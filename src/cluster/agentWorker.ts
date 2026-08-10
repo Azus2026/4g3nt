@@ -79,7 +79,7 @@ export class AgentWorker {
             await this.executor.execute(opp);
           }
         } else {
-          // Informar escaneo activo para pares en búsqueda de liquidez
+          // Si no hay respuesta de cotización en esta ronda, marcar en búsqueda sin poner 0.00
           LIVE_PAIR_RESULTS[pair.id] = {
             timestamp: new Date().toISOString(),
             agentId: this.definition.id,
@@ -87,11 +87,11 @@ export class AgentWorker {
             pairId: pair.id,
             pairName: pair.name,
             chainId: pair.chainId,
-            status: 'ROUTE_SEARCH',
-            leg1: { protocolId: 'UNISWAP-V3' },
-            leg2: { protocolId: 'SUSHISWAP' },
-            netProfitUSD: 0,
-            estimatedGasUSD: 0.05,
+            status: 'SEARCHING_ROUTE',
+            leg1: { protocolId: 'Buscando' },
+            leg2: { protocolId: 'Liquidez...' },
+            netProfitUSD: null,
+            estimatedGasUSD: 0,
             isProfitable: false,
           };
         }

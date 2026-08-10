@@ -89,45 +89,67 @@ export class MultiChainExecutor {
       return false;
     }
 
-    try {
-      logger.success(`[LIVE EXECUTION] Transmitiendo transacción de arbitraje a ChainID ${opportunity.chainId}...`);
+    return await executeWithNonceLock(opportunity.chainId, async () => {
+      try {
+        logger.success(`[LIVE EXECUTION] Transmitiendo transacción de arbitraje a ChainID ${opportunity.chainId}...`);
 
-      const activeWallet = wallet.connect(provider);
+        const activeWallet = wallet.connect(provider);
+        const pendingNonce = await activeWallet.getNonce('pending');
 
-      const tx = await activeWallet.sendTransaction({
-        to: toAddress,
-        data: dataHex,
-        value: valueHex,
-        gasLimit: opportunity.chainId === 1 ? 500000 : 350000,
-      });
+        const tx = await activeWallet.sendTransaction({
+          to: toAddress,
+          data: dataHex,
+          value: valueHex,
+          nonce: pendingNonce,
+          gasLimit: opportunity.chainId === 1 ? 500000 : 350000,
+        });
 
-      logger.success(`🛡️ Transacción enviada a la blockchain! Hash: ${tx.hash}`);
-      addScanLog(`🚀 [LIVE EXECUTION] Transacción transmitida. Hash: ${tx.hash}`);
+        logger.success(`🛡️ Transacción enviada a la blockchain! Hash: ${tx.hash}`);
+        addScanLog(`🚀 [LIVE EXECUTION] Transacción transmitida. Hash: ${tx.hash}`);
 
-      const receipt = await tx.wait();
-      if (receipt && receipt.status === 1) {
-        const explorerMap: Record<number, string> = {
-          1: 'https://etherscan.io/tx/',
-          42161: 'https://arbiscan.io/tx/',
-          137: 'https://polygonscan.com/tx/',
-          8453: 'https://basescan.org/tx/',
-          10: 'https://optimistic.etherscan.io/tx/',
-          56: 'https://bscscan.com/tx/',
-          43114: 'https://snowtrace.io/tx/',
-        };
-        const explorerUrl = (explorerMap[opportunity.chainId] || 'https://etherscan.io/tx/') + tx.hash;
-        logger.success(`🎉 Transacción confirmada en bloque #${receipt.blockNumber}! Explorer: ${explorerUrl}`);
-        addScanLog(`🎉 [CONFIRMADA] Arbitraje Ejecutado Bloque #${receipt.blockNumber} | Explorer: ${explorerUrl}`);
-        return true;
-      } else {
-        logger.error(`Transacción revertida.`);
-        addScanLog(`❌ Transacción de arbitraje revertida sin costo en gas.`);
+        const receipt = await tx.wait();
+        if (receipt && receipt.status === 1) {
+          const explorerMap: Record<number, string> = {
+            1: 'https://etherscan.io/tx/',
+            42161: 'https://arbiscan.io/tx/',
+            137: 'https://polygonscan.com/tx/',
+            8453: 'https://basescan.org/tx/',
+            10: 'https://optimistic.etherscan.io/tx/',
+            56: 'https://bscscan.com/tx/',
+            43114: 'https://snowtrace.io/tx/',
+          };
+          const explorerUrl = (explorerMap[opportunity.chainId] || 'https://etherscan.io/tx/') + tx.hash;
+          logger.success(`🎉 Transacción confirmada en bloque #${receipt.blockNumber}! Explorer: ${explorerUrl}`);
+          addScanLog(`🎉 [CONFIRMADA] Arbitraje Ejecutado Bloque #${receipt.blockNumber} | Explorer: ${explorerUrl}`);
+          return true;
+        } else {
+          logger.error(`Transacción revertida en bloque #${receipt?.blockNumber || 'desconocido'}.`);
+          addScanLog(`❌ Transacción de arbitraje revertida sin costo en gas.`);
+          return false;
+        }
+      } catch (err: any) {
+        logger.error(`Error en ejecución live: ${err.message}`);
+        addScanLog(`❌ Error en transmisión live: ${err.message}`);
         return false;
       }
-    } catch (err: any) {
-      logger.error(`Error en ejecución live: ${err.message}`);
-      addScanLog(`❌ Error en transmisión live: ${err.message}`);
-      return false;
-    }
+    });
+  }
+}
+
+const chainNonceLocks: Record<number, Promise<void>> = {};
+
+async function executeWithNonceLock<T>(chainId: number, fn: () => Promise<T>): Promise<T> {
+  const currentLock = chainNonceLocks[chainId] || Promise.resolve();
+  let release: () => void = () => {};
+  const nextLock = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  chainNonceLocks[chainId] = currentLock.then(() => nextLock);
+
+  try {
+    await currentLock;
+    return await fn();
+  } finally {
+    release();
   }
 }

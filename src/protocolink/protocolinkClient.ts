@@ -1,5 +1,6 @@
 import * as api from '@protocolink/api';
 import { ethers } from 'ethers';
+import axios from 'axios';
 import { TokenConfig } from '../config/registry';
 import { ENV } from '../config/env';
 import { logger } from '../utils/logger';
@@ -119,6 +120,42 @@ export class ProtocolinkClient {
   }
 
   /**
+   * Consulta API Agregador KyberSwap
+   */
+  async getKyberSwapQuote(
+    chainId: number,
+    tokenIn: TokenConfig,
+    tokenOut: TokenConfig,
+    amountIn: string
+  ): Promise<DEXQuote | null> {
+    const chainSlugMap: Record<number, string> = { 1: 'ethereum', 42161: 'arbitrum', 137: 'polygon', 10: 'optimism', 8453: 'base', 56: 'bsc' };
+    const slug = chainSlugMap[chainId];
+    if (!slug) return null;
+
+    try {
+      const rawAmount = ethers.parseUnits(amountIn, tokenIn.decimals).toString();
+      const url = `https://aggregator-api.kyberswap.com/${slug}/api/v1/routes?tokenIn=${tokenIn.address}&tokenOut=${tokenOut.address}&amountIn=${rawAmount}`;
+      const res = await axios.get(url, { timeout: 3000 });
+      if (res.data && res.data.data && res.data.data.routeSummary) {
+        const outRaw = res.data.data.routeSummary.amountOut;
+        const formattedOut = ethers.formatUnits(outRaw, tokenOut.decimals);
+        return {
+          protocolId: 'kyberswap-v1',
+          chainId,
+          inputToken: tokenIn,
+          outputToken: tokenOut,
+          inputAmount: amountIn,
+          outputAmount: formattedOut,
+          logic: null,
+        };
+      }
+    } catch {
+      // Ignorar timeouts de KyberSwap
+    }
+    return null;
+  }
+
+  /**
    * Consulta cotizaciones de Swap en DEXs por cadena (Resistente a fallos con retorno individual seguro)
    */
   async getSwapQuotation(
@@ -135,6 +172,8 @@ export class ProtocolinkClient {
         return await this.getOnChainUniswapV3Quote(chainId, tokenIn, tokenOut, amountIn, 3000);
       } else if (protocolId === 'uniswap-v3-1%') {
         return await this.getOnChainUniswapV3Quote(chainId, tokenIn, tokenOut, amountIn, 10000);
+      } else if (protocolId === 'kyberswap-v1') {
+        return await this.getKyberSwapQuote(chainId, tokenIn, tokenOut, amountIn);
       }
 
       let quotation: any = null;
@@ -162,13 +201,6 @@ export class ProtocolinkClient {
           tokenOut: tokenOut,
         }).catch(() => null);
         if (quotation) logic = api.protocols.paraswapv5.newSwapTokenLogic(quotation);
-      } else if (protocolId === 'zeroex-v4') {
-        quotation = await api.protocols.zeroexv4.getSwapTokenQuotation(chainId, {
-          input: { token: tokenIn, amount: amountIn },
-          tokenOut: tokenOut,
-          apiKey: '',
-        }).catch(() => null);
-        if (quotation) logic = api.protocols.zeroexv4.newSwapTokenLogic(quotation);
       }
 
       if (quotation && quotation.output && quotation.output.amount) {

@@ -1,4 +1,5 @@
 import * as api from '@protocolink/api';
+import { ethers } from 'ethers';
 import { TokenConfig } from '../config/registry';
 import { ENV } from '../config/env';
 import { logger } from '../utils/logger';
@@ -33,6 +34,28 @@ export interface ArbitrageOpportunity {
   cexDEXSpreadPercent?: number;
 }
 
+const UNISWAP_V3_QUOTER_ABI = [
+  'function quoteExactInputSingle(address tokenIn, address tokenOut, uint24 fee, uint256 amountIn, uint160 sqrtPriceLimitX96) external returns (uint256 amountOut)'
+];
+
+const UNISWAP_V3_QUOTER_ADDRESSES: Record<number, string> = {
+  1: '0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6',
+  42161: '0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6',
+  137: '0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6',
+  10: '0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6',
+  8453: '0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a',
+};
+
+const RPC_FALLBACKS: Record<number, string> = {
+  1: 'https://ethereum.publicnode.com',
+  42161: 'https://arb1.arbitrum.io/rpc',
+  137: 'https://polygon-bor-rpc.publicnode.com',
+  10: 'https://mainnet.optimism.io',
+  8453: 'https://mainnet.base.org',
+  56: 'https://bsc-dataseed.binance.org',
+  43114: 'https://api.avax.network/ext/bc/C/rpc',
+};
+
 export class ProtocolinkClient {
 
   /**
@@ -52,7 +75,50 @@ export class ProtocolinkClient {
   }
 
   /**
-   * Consulta cotizaciones de Swap en DEXs por cadena
+   * Consulta cotización On-Chain directa usando el Quoter de Uniswap V3 (100% confiable sin bloqueos HTTP)
+   */
+  async getOnChainUniswapV3Quote(
+    chainId: number,
+    tokenIn: TokenConfig,
+    tokenOut: TokenConfig,
+    amountIn: string
+  ): Promise<DEXQuote | null> {
+    const quoterAddress = UNISWAP_V3_QUOTER_ADDRESSES[chainId];
+    const rpcUrl = RPC_FALLBACKS[chainId];
+    if (!quoterAddress || !rpcUrl) return null;
+
+    try {
+      const provider = new ethers.JsonRpcProvider(rpcUrl, chainId, { staticNetwork: true });
+      const quoter = new ethers.Contract(quoterAddress, UNISWAP_V3_QUOTER_ABI, provider);
+
+      const parsedAmountIn = ethers.parseUnits(amountIn, tokenIn.decimals);
+      
+      // Probar tier de fee 3000 (0.3%) y luego 500 (0.05%)
+      let amountOut: bigint;
+      try {
+        amountOut = await quoter.quoteExactInputSingle.staticCall(tokenIn.address, tokenOut.address, 3000, parsedAmountIn, 0);
+      } catch {
+        amountOut = await quoter.quoteExactInputSingle.staticCall(tokenIn.address, tokenOut.address, 500, parsedAmountIn, 0);
+      }
+
+      const formattedOut = ethers.formatUnits(amountOut, tokenOut.decimals);
+
+      return {
+        protocolId: 'uniswap-v3',
+        chainId,
+        inputToken: tokenIn,
+        outputToken: tokenOut,
+        inputAmount: amountIn,
+        outputAmount: formattedOut,
+        logic: null,
+      };
+    } catch (err: any) {
+      return null;
+    }
+  }
+
+  /**
+   * Consulta cotizaciones de Swap en DEXs por cadena (híbrido API Protocolink + On-Chain Directo)
    */
   async getSwapQuotation(
     protocolId: string,
@@ -66,11 +132,16 @@ export class ProtocolinkClient {
       let logic: any = null;
 
       if (protocolId === 'uniswap-v3') {
-        quotation = await api.protocols.uniswapv3.getSwapTokenQuotation(chainId, {
-          input: { token: tokenIn, amount: amountIn },
-          tokenOut: tokenOut,
-        });
-        logic = api.protocols.uniswapv3.newSwapTokenLogic(quotation);
+        try {
+          quotation = await api.protocols.uniswapv3.getSwapTokenQuotation(chainId, {
+            input: { token: tokenIn, amount: amountIn },
+            tokenOut: tokenOut,
+          });
+          logic = api.protocols.uniswapv3.newSwapTokenLogic(quotation);
+        } catch {
+          // Si la API falla (ej. 403 Forbidden), recurrir al Quoter On-Chain directo de Uniswap V3
+          return await this.getOnChainUniswapV3Quote(chainId, tokenIn, tokenOut, amountIn);
+        }
       } else if (protocolId === 'openocean-v2') {
         quotation = await api.protocols.openoceanv2.getSwapTokenQuotation(chainId, {
           input: { token: tokenIn, amount: amountIn },
@@ -104,8 +175,14 @@ export class ProtocolinkClient {
         };
       }
     } catch (error: any) {
-      // Ignorar rutas sin liquidez suficiente
+      // Ignorar rutas sin liquidez o con error de API
     }
+
+    // Fallback final on-chain para Uniswap V3 si protocolId es uniswap-v3
+    if (protocolId === 'uniswap-v3') {
+      return await this.getOnChainUniswapV3Quote(chainId, tokenIn, tokenOut, amountIn);
+    }
+
     return null;
   }
 

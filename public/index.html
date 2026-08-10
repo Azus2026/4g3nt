@@ -244,7 +244,7 @@
       </div>
       <div class="stat-card">
         <div class="stat-label">Filtro de Ganancia</div>
-        <div class="stat-value">$5.00 USD</div>
+        <div class="stat-value" id="valMinProfitUSD">$0.50 USD</div>
         <div class="stat-sub">Seguridad IA Swarm</div>
       </div>
     </div>
@@ -316,6 +316,9 @@
 
         document.getElementById('lblLiveScans').innerText = `${statusRes.stats.scansCompleted} Escaneos Vivo`;
         document.getElementById('valScansCount').innerText = statusRes.stats.scansCompleted;
+        if (document.getElementById('valMinProfitUSD') && typeof statusRes.minProfitUSD === 'number') {
+          document.getElementById('valMinProfitUSD').innerText = `$${statusRes.minProfitUSD.toFixed(2)} USD`;
+        }
 
         renderSwarm(agentsRes);
         renderPairs(pairsRes, liveRes, statusRes.dryRun);

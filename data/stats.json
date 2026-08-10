@@ -1,7 +1,9 @@
 {
-  "positiveOpportunitiesCount": 65,
-  "totalRealizedPnLUSD": 111.81430771998157,
-  "opportunitiesFound": 65,
-  "scansCompleted": 1743,
-  "lastUpdated": "2026-08-10T17:08:59.582Z"
+  "detectedOpportunitiesCount": 66,
+  "detectedPnLUSD": 196.19790320975503,
+  "onChainExecutedCount": 0,
+  "onChainRealizedPnLUSD": 0,
+  "opportunitiesFound": 138,
+  "scansCompleted": 2558,
+  "lastUpdated": "2026-08-10T17:16:41.035Z"
 }

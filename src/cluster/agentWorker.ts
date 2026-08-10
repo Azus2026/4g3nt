@@ -4,6 +4,7 @@ import { AIStrategyAgent } from '../agent/aiStrategyAgent';
 import { MultiChainExecutor } from '../executor/multiChainExecutor';
 import { RPCManager } from '../providers/rpcManager';
 import { SERVER_STATS, LIVE_PAIR_RESULTS, addScanLog } from '../server';
+import { savePersistedStats } from '../utils/statsStore';
 import { logger } from '../utils/logger';
 
 export interface AgentWorkerStatus {
@@ -74,6 +75,7 @@ export class AgentWorker {
             SERVER_STATS.opportunitiesFound++;
             SERVER_STATS.positiveOpportunitiesCount++;
             SERVER_STATS.totalRealizedPnLUSD += (opp.netProfitUSD > 0 ? opp.netProfitUSD : 0);
+            savePersistedStats();
             SERVER_STATS.lastOpportunities.unshift(LIVE_PAIR_RESULTS[pair.id]);
             if (SERVER_STATS.lastOpportunities.length > 20) {
               SERVER_STATS.lastOpportunities.pop();

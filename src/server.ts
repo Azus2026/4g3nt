@@ -5,6 +5,7 @@ import { MULTI_CHAIN_ARBITRAGE_PAIRS, DEX_PROTOCOLS, SWARM_AGENTS } from './conf
 import { SUPPORTED_CHAINS } from './config/chains';
 import { SwarmManager } from './cluster/swarmManager';
 import { streamProcessor, StreamPayload } from './mempool/quicknodeStreamProcessor';
+import { loadPersistedStats } from './utils/statsStore';
 import { logger } from './utils/logger';
 
 const app = express();
@@ -118,6 +119,7 @@ app.get('/api/opportunities', (req, res) => {
 });
 
 export function startServer(initialPort: number = ENV.port) {
+  loadPersistedStats();
   const server = app.listen(initialPort, () => {
     logger.info(`🌐 Servidor de monitoreo V2 ejecutándose en http://localhost:${initialPort}`);
     logger.info(`   -> Dashboard Web: http://localhost:${initialPort}`);

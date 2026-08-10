@@ -98,7 +98,8 @@ export class RPCManager {
       try {
         const start = Date.now();
         const dedicatedProvider = new ethers.JsonRpcProvider(primaryEnvUrl, chainId, { staticNetwork: true });
-        await dedicatedProvider.getBlockNumber();
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('RPC Timeout')), 3000));
+        await Promise.race([dedicatedProvider.getBlockNumber(), timeoutPromise]);
         const latencyMs = Date.now() - start;
         const dedicatedRpc: ActiveRPC = {
           chainId,
@@ -125,7 +126,8 @@ export class RPCManager {
       try {
         const start = Date.now();
         const testProvider = new ethers.JsonRpcProvider(url, chainId, { staticNetwork: true });
-        await testProvider.getBlockNumber();
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('RPC Timeout')), 3000));
+        await Promise.race([testProvider.getBlockNumber(), timeoutPromise]);
         const latencyMs = Date.now() - start;
 
         if (!bestRpc || latencyMs < bestRpc.latencyMs) {

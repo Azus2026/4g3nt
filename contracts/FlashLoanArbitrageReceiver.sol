@@ -1,20 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 /**
  * @title FlashLoanArbitrageReceiver
  * @notice High-performance atomic flash loan arbitrage execution contract across DEXs.
- * @dev Optimized for gas, reentrancy safe, with strict profit checking and slippage enforcement.
+ * @dev SafeERC20 protected, gas optimized, reentrancy safe, with strict profit checking and slippage enforcement.
  */
-
-interface IERC20 {
-    function totalSupply() external view returns (uint256);
-    function balanceOf(address account) external view returns (uint256);
-    function transfer(address recipient, uint256 amount) external returns (bool);
-    function allowance(address owner, address spender) external view returns (uint256);
-    function approve(address spender, uint256 amount) external returns (bool);
-    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
-}
 
 interface IFlashLoanSimpleReceiver {
     function executeOperation(
@@ -46,6 +40,8 @@ abstract contract ReentrancyGuard {
 }
 
 contract FlashLoanArbitrageReceiver is IFlashLoanSimpleReceiver, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     address public immutable owner;
     address public immutable ADDRESSES_PROVIDER;
 
@@ -117,8 +113,8 @@ contract FlashLoanArbitrageReceiver is IFlashLoanSimpleReceiver, ReentrancyGuard
             revert ArbitrageNotProfitable(currentBalance, totalRepay + minNetProfit);
         }
 
-        // 5. Approve Pool to repay the flash loan
-        IERC20(asset).approve(msg.sender, totalRepay);
+        // 5. Approve Pool to repay the flash loan (SafeERC20 for non-standard tokens like USDT)
+        IERC20(asset).forceApprove(msg.sender, totalRepay);
 
         uint256 netProfit = currentBalance - totalRepay;
         emit ArbitrageExecuted(asset, amount, premium, netProfit);
@@ -127,12 +123,12 @@ contract FlashLoanArbitrageReceiver is IFlashLoanSimpleReceiver, ReentrancyGuard
     }
 
     /**
-     * @notice Withdraw funds/profits to contract owner.
+     * @notice Withdraw funds/profits to contract owner. SafeERC20 protected for non-standard tokens.
      */
     function withdrawToken(address token) external onlyOwner nonReentrant {
         uint256 balance = IERC20(token).balanceOf(address(this));
         if (balance == 0) revert InsufficientBalance(0, 1);
-        IERC20(token).transfer(owner, balance);
+        IERC20(token).safeTransfer(owner, balance);
         emit EmergencyWithdrawal(token, balance);
     }
 

@@ -243,15 +243,6 @@ export class ProtocolinkClient {
     const apiTokenOut = this.toApiToken(quote.outputToken);
 
     try {
-      const psQuote = await api.protocols.paraswapv5.getSwapTokenQuotation(chainId, {
-        input: { token: apiTokenIn, amount: quote.inputAmount },
-        tokenOut: apiTokenOut,
-        slippage: 100,
-      }).catch(() => null);
-      if (psQuote) {
-        return api.protocols.paraswapv5.newSwapTokenLogic(psQuote);
-      }
-
       const uniQuote = await api.protocols.uniswapv3.getSwapTokenQuotation(chainId, {
         input: { token: apiTokenIn, amount: quote.inputAmount },
         tokenOut: apiTokenOut,
@@ -259,6 +250,16 @@ export class ProtocolinkClient {
       }).catch(() => null);
       if (uniQuote) {
         return api.protocols.uniswapv3.newSwapTokenLogic(uniQuote);
+      }
+
+      const psQuote = await api.protocols.paraswapv5.getSwapTokenQuotation(chainId, {
+        input: { token: apiTokenIn, amount: quote.inputAmount },
+        tokenOut: apiTokenOut,
+        slippage: 100,
+        excludeDEXS: ['Dexalot', 'Dexalot-42161'],
+      } as any).catch(() => null);
+      if (psQuote) {
+        return api.protocols.paraswapv5.newSwapTokenLogic(psQuote);
       }
     } catch {
       // Ignorar fallback errors
@@ -310,7 +311,38 @@ export class ProtocolinkClient {
       };
     } catch (err: any) {
       const detail = err.response && err.response.data ? JSON.stringify(err.response.data) : err.message;
-      logger.warn(`Falló la solicitud de construcción del router: ${detail}`);
+      logger.warn(`Falló la solicitud de construcción del router (${detail}). Intentando fallback con Uniswap V3...`);
+
+      try {
+        const fallbackLogic1 = await api.protocols.uniswapv3.getSwapTokenQuotation(chainId, {
+          input: { token: this.toApiToken(leg1.inputToken), amount: leg1.inputAmount },
+          tokenOut: this.toApiToken(leg1.outputToken),
+          slippage: 100,
+        }).then(q => api.protocols.uniswapv3.newSwapTokenLogic(q)).catch(() => null);
+
+        const fallbackLogic2 = await api.protocols.uniswapv3.getSwapTokenQuotation(chainId, {
+          input: { token: this.toApiToken(leg2.inputToken), amount: leg2.inputAmount },
+          tokenOut: this.toApiToken(leg2.outputToken),
+          slippage: 100,
+        }).then(q => api.protocols.uniswapv3.newSwapTokenLogic(q)).catch(() => null);
+
+        if (fallbackLogic1 && fallbackLogic2) {
+          const fallbackLogics = [flashLoanLoanLogic, fallbackLogic1, fallbackLogic2, flashLoanRepayLogic];
+          const fallbackRouterData = await api.buildRouterTransactionRequest({
+            chainId,
+            account,
+            logics: fallbackLogics,
+          });
+          logger.success(`✅ Router Payload generado exitosamente usando fallback Uniswap V3 sin restricciones.`);
+          return {
+            logics: fallbackLogics,
+            routerData: fallbackRouterData,
+          };
+        }
+      } catch (fallbackErr: any) {
+        logger.warn(`Fallback Uniswap V3 también falló: ${fallbackErr.message}`);
+      }
+
       return { logics, routerData: null };
     }
   }

@@ -292,7 +292,8 @@ export class ProtocolinkClient {
         routerData: transactionRequest,
       };
     } catch (err: any) {
-      logger.warn(`Falló la solicitud de construcción del router: ${err.message}`);
+      const detail = err.response && err.response.data ? JSON.stringify(err.response.data) : err.message;
+      logger.warn(`Falló la solicitud de construcción del router: ${detail}`);
       return { logics, routerData: null };
     }
   }

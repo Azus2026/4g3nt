@@ -53,6 +53,17 @@ app.get('/api/status', (req, res) => {
 });
 
 /**
+ * Webhook GET status endpoint para verificación en navegador
+ */
+app.get('/api/mempool-stream', (req, res) => {
+  res.json({
+    status: 'ONLINE',
+    endpoint: 'POST /api/mempool-stream',
+    message: 'QuickNode Stream Webhook Listener Activo y Listo',
+  });
+});
+
+/**
  * Webhook Receptor en tiempo real para QuickNode Streams (< 5ms)
  * Soporta cargas útiles grandes de bloques (hasta 50MB)
  */

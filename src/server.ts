@@ -36,6 +36,8 @@ export const SERVER_STATS = {
   startedAt: new Date().toISOString(),
   scansCompleted: 0,
   opportunitiesFound: 0,
+  positiveOpportunitiesCount: 0,
+  totalRealizedPnLUSD: 0,
   lastOpportunities: [] as any[],
   activeChainsCount: Object.keys(SUPPORTED_CHAINS).length,
   activePairsCount: MULTI_CHAIN_ARBITRAGE_PAIRS.length,

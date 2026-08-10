@@ -243,9 +243,14 @@
         <div class="stat-sub">Consultas en Tiempo Real</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Filtro de Ganancia</div>
-        <div class="stat-value" id="valMinProfitUSD">$0.50 USD</div>
-        <div class="stat-sub">Seguridad IA Swarm</div>
+        <div class="stat-label">Arbitrajes Positivos</div>
+        <div class="stat-value" id="valPositiveCount" style="color: var(--accent-cyan);">0 Exitosos</div>
+        <div class="stat-sub">Alertas Ejecutadas</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">PnL Realizado Total</div>
+        <div class="stat-value" id="valTotalPnLUSD" style="color: var(--accent-green);">$0.00 USD</div>
+        <div class="stat-sub">Ganancia Neta Acumulada</div>
       </div>
     </div>
 
@@ -316,8 +321,14 @@
 
         document.getElementById('lblLiveScans').innerText = `${statusRes.stats.scansCompleted} Escaneos Vivo`;
         document.getElementById('valScansCount').innerText = statusRes.stats.scansCompleted;
-        if (document.getElementById('valMinProfitUSD') && typeof statusRes.minProfitUSD === 'number') {
-          document.getElementById('valMinProfitUSD').innerText = `$${statusRes.minProfitUSD.toFixed(2)} USD`;
+        if (document.getElementById('valPositiveCount')) {
+          document.getElementById('valPositiveCount').innerText = `${statusRes.stats.positiveOpportunitiesCount || 0} Exitosos`;
+        }
+        if (document.getElementById('valTotalPnLUSD')) {
+          const pnlVal = statusRes.stats.totalRealizedPnLUSD || 0;
+          const pnlEl = document.getElementById('valTotalPnLUSD');
+          pnlEl.innerText = `${pnlVal >= 0 ? '+' : ''}$${pnlVal.toFixed(2)} USD`;
+          pnlEl.style.color = pnlVal > 0 ? 'var(--accent-green)' : '#10b981';
         }
 
         renderSwarm(agentsRes);

@@ -35,7 +35,7 @@ export const SUPPORTED_CHAINS: Record<number, ChainConfig> = {
       'https://arbitrum.llamarpc.com',
       'https://rpc.ankr.com/arbitrum',
     ],
-    wssUrl: 'wss://arbitrum-one-rpc.publicnode.com',
+    wssUrl: process.env.ARBITRUM_WSS_URL || 'wss://arbitrum-one-rpc.publicnode.com',
     blockExplorer: 'https://arbiscan.io',
     flashLoanProviders: ['balancerv2', 'aavev3'],
   },

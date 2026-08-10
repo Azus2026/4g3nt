@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc",
     "compile:contracts": "hardhat compile",
-    "start": "ts-node src/index.ts",
+    "start": "node dist/src/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "server": "ts-node src/server.ts"
   },

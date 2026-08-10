@@ -8,7 +8,7 @@ import { logger } from './utils/logger';
 
 const app = express();
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../public')));
+app.use(express.static(path.join(process.cwd(), 'public')));
 
 export let globalSwarmManager: SwarmManager | null = null;
 export const LIVE_PAIR_RESULTS: Record<string, any> = {};

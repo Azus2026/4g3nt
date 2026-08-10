@@ -83,28 +83,26 @@ export class MultiChainExecutor {
       }
     }
 
-    // 3. Ejecución real protegida contra MEV vía Flashbots Relay / Fastlane (0 Gas si revierte)
+    // 3. Ejecución real protegida en red con wallet conectada a RPC de alta velocidad
     if (!wallet) {
       logger.error(`No se configuró PRIVATE_KEY válida para transmitir en red real.`);
       return false;
     }
 
     try {
-      const targetRpcUrl = FLASHBOTS_RPC_MAP[opportunity.chainId] || provider._getConnection().url;
-      logger.success(`[LIVE MEV EXECUTION] Transmitiendo bundle privado vía Flashbots/Relay (${targetRpcUrl})...`);
+      logger.success(`[LIVE EXECUTION] Transmitiendo transacción de arbitraje a ChainID ${opportunity.chainId}...`);
 
-      const relayProvider = new ethers.JsonRpcProvider(targetRpcUrl);
-      const relayWallet = wallet.connect(relayProvider);
+      const activeWallet = wallet.connect(provider);
 
-      const tx = await relayWallet.sendTransaction({
+      const tx = await activeWallet.sendTransaction({
         to: toAddress,
         data: dataHex,
         value: valueHex,
-        gasLimit: opportunity.chainId === 1 ? 500000 : 300000,
+        gasLimit: opportunity.chainId === 1 ? 500000 : 350000,
       });
 
-      logger.success(`🛡️ Transacción privada enviada a Flashbots. Hash: ${tx.hash}`);
-      addScanLog(`🚀 [LIVE MEV EXECUTION] Transacción transmitida. Hash: ${tx.hash}`);
+      logger.success(`🛡️ Transacción enviada a la blockchain! Hash: ${tx.hash}`);
+      addScanLog(`🚀 [LIVE EXECUTION] Transacción transmitida. Hash: ${tx.hash}`);
 
       const receipt = await tx.wait();
       if (receipt && receipt.status === 1) {
@@ -127,7 +125,8 @@ export class MultiChainExecutor {
         return false;
       }
     } catch (err: any) {
-      logger.error(`Error en ejecución live Flashbots: ${err.message}`);
+      logger.error(`Error en ejecución live: ${err.message}`);
+      addScanLog(`❌ Error en transmisión live: ${err.message}`);
       return false;
     }
   }

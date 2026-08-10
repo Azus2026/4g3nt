@@ -21,7 +21,7 @@ export const SUPPORTED_CHAINS: Record<number, ChainConfig> = {
       'https://rpc.ankr.com/eth',
       'https://ethereum.publicnode.com',
     ],
-    wssUrl: 'wss://ethereum-rpc.publicnode.com',
+    wssUrl: process.env.ETH_WSS_URL || 'wss://ethereum-rpc.publicnode.com',
     blockExplorer: 'https://etherscan.io',
     flashLoanProviders: ['balancerv2', 'aavev3', 'uniswapv3'],
   },

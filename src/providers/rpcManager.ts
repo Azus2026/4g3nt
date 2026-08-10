@@ -106,7 +106,11 @@ export class RPCManager {
         await testProvider.getBlockNumber();
         const latencyMs = Date.now() - start;
 
-        if (!bestRpc || latencyMs < bestRpc.latencyMs) {
+        // Si la URL contiene quicknode o infura o alchemy, darle prioridad extrema
+        const isDedicated = url.includes('quiknode') || url.includes('infura') || url.includes('alchemy');
+        const adjustedLatency = isDedicated ? latencyMs / 10 : latencyMs;
+
+        if (!bestRpc || adjustedLatency < bestRpc.latencyMs) {
           bestRpc = {
             chainId,
             url,

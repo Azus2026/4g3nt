@@ -5,7 +5,7 @@ import { MULTI_CHAIN_ARBITRAGE_PAIRS, DEX_PROTOCOLS, SWARM_AGENTS } from './conf
 import { SUPPORTED_CHAINS } from './config/chains';
 import { SwarmManager } from './cluster/swarmManager';
 import { streamProcessor, StreamPayload } from './mempool/quicknodeStreamProcessor';
-import { loadPersistedStats } from './utils/statsStore';
+import { loadPersistedStats, savePersistedStats } from './utils/statsStore';
 import { logger } from './utils/logger';
 
 const app = express();
@@ -55,6 +55,18 @@ app.get('/api/status', (req, res) => {
     minProfitUSD: ENV.minProfitUSD,
     stats: SERVER_STATS,
   });
+});
+
+app.all('/api/reset-stats', (req, res) => {
+  SERVER_STATS.scansCompleted = 0;
+  SERVER_STATS.opportunitiesFound = 0;
+  SERVER_STATS.detectedOpportunitiesCount = 0;
+  SERVER_STATS.detectedPnLUSD = 0;
+  SERVER_STATS.onChainExecutedCount = 0;
+  SERVER_STATS.onChainRealizedPnLUSD = 0;
+  SERVER_STATS.lastOpportunities = [];
+  savePersistedStats();
+  res.json({ success: true, message: 'Estadísticas reiniciadas a 0 exitosamente', stats: SERVER_STATS });
 });
 
 /**

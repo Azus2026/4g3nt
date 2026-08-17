@@ -48,8 +48,8 @@ export class SweetSpotOptimizer {
     const baseAmount = parseFloat(pair.defaultLoanAmount);
     if (baseAmount <= 0) return null;
 
-    // 1. Prospección inicial en puntos de rejilla logarítmicos
-    const probeMultipliers = [0.25, 0.5, 1.0, 2.0, 3.5, 5.0];
+    // 1. Prospección inicial rápida en puntos de alta probabilidad (0.5x, 1.0x, 2.0x)
+    const probeMultipliers = [0.5, 1.0, 2.0];
     const probePromises = probeMultipliers.map(async (m) => {
       const amt = (baseAmount * m).toFixed(6);
       const opp = await evaluateFn(amt).catch(() => null);

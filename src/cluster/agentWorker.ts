@@ -50,65 +50,75 @@ export class AgentWorker {
     this.status = 'SCANNING';
 
     try {
-      this.scansCount++;
+      // Procesar pares en lotes paralelos de 4 para maximizar velocidad en los 8 núcleos del VPS
+      const batchSize = 4;
+      for (let i = 0; i < this.assignedPairs.length; i += batchSize) {
+        const batch = this.assignedPairs.slice(i, i + batchSize);
+        const batchPromises = batch.map(async (pair) => {
+          this.scansCount++;
+          SERVER_STATS.scansCompleted++;
 
-      for (const pair of this.assignedPairs) {
-        const opp = await this.scanner.scanPair(pair);
-        SERVER_STATS.scansCompleted++;
+          try {
+            const opp = await this.scanner.scanPair(pair);
 
-        if (opp) {
-          this.lastOpportunity = opp;
-          LIVE_PAIR_RESULTS[pair.id] = {
-            timestamp: new Date().toISOString(),
-            agentId: this.definition.id,
-            agentName: this.definition.name,
-            status: 'ACTIVE',
-            ...opp,
-          };
+            if (opp) {
+              this.lastOpportunity = opp;
+              LIVE_PAIR_RESULTS[pair.id] = {
+                timestamp: new Date().toISOString(),
+                agentId: this.definition.id,
+                agentName: this.definition.name,
+                status: 'ACTIVE',
+                ...opp,
+              };
 
-          const evalResult = this.aiAgent.evaluate(opp);
-          const logMsg = `[${this.definition.name}] ${opp.pairName}: Leg1 (${opp.leg1.protocolId.toUpperCase()}) ➔ Leg2 (${opp.leg2.protocolId.toUpperCase()}) | Margen Est: $${opp.netProfitUSD.toFixed(2)} USD | Gas: $${opp.estimatedGasUSD.toFixed(2)}`;
-          logger.ai(logMsg);
-          addScanLog(logMsg);
+              const evalResult = this.aiAgent.evaluate(opp);
+              const logMsg = `[${this.definition.name}] ${opp.pairName}: Leg1 (${opp.leg1.protocolId.toUpperCase()}) ➔ Leg2 (${opp.leg2.protocolId.toUpperCase()}) | Margen Est: $${opp.netProfitUSD.toFixed(2)} USD | Gas: $${opp.estimatedGasUSD.toFixed(2)}`;
+              logger.ai(logMsg);
+              addScanLog(logMsg);
 
-          if (evalResult.recommendation === 'EXECUTE' || evalResult.recommendation === 'SIMULATE_ONLY') {
-            this.opportunitiesFound++;
-            SERVER_STATS.opportunitiesFound++;
-            SERVER_STATS.detectedOpportunitiesCount++;
-            SERVER_STATS.detectedPnLUSD += (opp.netProfitUSD > 0 ? opp.netProfitUSD : 0);
-            savePersistedStats();
-            SERVER_STATS.lastOpportunities.unshift(LIVE_PAIR_RESULTS[pair.id]);
-            if (SERVER_STATS.lastOpportunities.length > 20) {
-              SERVER_STATS.lastOpportunities.pop();
+              if (evalResult.recommendation === 'EXECUTE' || evalResult.recommendation === 'SIMULATE_ONLY') {
+                this.opportunitiesFound++;
+                SERVER_STATS.opportunitiesFound++;
+                SERVER_STATS.detectedOpportunitiesCount++;
+                SERVER_STATS.detectedPnLUSD += (opp.netProfitUSD > 0 ? opp.netProfitUSD : 0);
+                savePersistedStats();
+                SERVER_STATS.lastOpportunities.unshift(LIVE_PAIR_RESULTS[pair.id]);
+                if (SERVER_STATS.lastOpportunities.length > 20) {
+                  SERVER_STATS.lastOpportunities.pop();
+                }
+
+                this.status = 'EXECUTING';
+                const executed = await this.executor.execute(opp);
+                if (executed) {
+                  SERVER_STATS.onChainExecutedCount++;
+                  SERVER_STATS.onChainRealizedPnLUSD += (opp.netProfitUSD > 0 ? opp.netProfitUSD : 0);
+                  savePersistedStats();
+                  await telegramNotifier.notifyExecution(opp, this.definition.name).catch(() => {});
+                }
+              }
+            } else {
+              LIVE_PAIR_RESULTS[pair.id] = {
+                timestamp: new Date().toISOString(),
+                agentId: this.definition.id,
+                agentName: this.definition.name,
+                pairId: pair.id,
+                pairName: pair.name,
+                chainId: pair.chainId,
+                status: 'SEARCHING_ROUTE',
+                leg1: { protocolId: 'Buscando' },
+                leg2: { protocolId: 'Liquidez...' },
+                netProfitUSD: null,
+                estimatedGasUSD: 0,
+                isProfitable: false,
+              };
+              addScanLog(`[${this.definition.name}] Escaneando ${pair.name}... (Consultando bloques on-chain)`);
             }
-
-            this.status = 'EXECUTING';
-            const executed = await this.executor.execute(opp);
-            if (executed) {
-              SERVER_STATS.onChainExecutedCount++;
-              SERVER_STATS.onChainRealizedPnLUSD += (opp.netProfitUSD > 0 ? opp.netProfitUSD : 0);
-              savePersistedStats();
-              await telegramNotifier.notifyExecution(opp, this.definition.name).catch(() => {});
-            }
+          } catch (pairErr) {
+            // Manejo de error silencioso para no interrumpir el flujo del cluster
           }
-        } else {
-          // Informar escaneo activo para pares en búsqueda de liquidez
-          LIVE_PAIR_RESULTS[pair.id] = {
-            timestamp: new Date().toISOString(),
-            agentId: this.definition.id,
-            agentName: this.definition.name,
-            pairId: pair.id,
-            pairName: pair.name,
-            chainId: pair.chainId,
-            status: 'SEARCHING_ROUTE',
-            leg1: { protocolId: 'Buscando' },
-            leg2: { protocolId: 'Liquidez...' },
-            netProfitUSD: null,
-            estimatedGasUSD: 0,
-            isProfitable: false,
-          };
-          addScanLog(`[${this.definition.name}] Escaneando ${pair.name}... (Consultando bloques on-chain)`);
-        }
+        });
+
+        await Promise.all(batchPromises);
       }
     } catch (err: any) {
       this.status = 'ERROR';

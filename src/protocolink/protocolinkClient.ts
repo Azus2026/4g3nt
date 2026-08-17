@@ -50,12 +50,22 @@ const UNISWAP_V3_QUOTER_ADDRESSES: Record<number, string> = {
 };
 
 const RPC_FALLBACKS: Record<number, string> = {
-  1: 'https://ethereum.publicnode.com',
-  42161: 'https://arb1.arbitrum.io/rpc',
-  137: 'https://polygon-bor-rpc.publicnode.com',
-  10: 'https://mainnet.optimism.io',
-  8453: 'https://mainnet.base.org',
+  1: process.env.ETH_RPC_URL || 'https://ethereum.publicnode.com',
+  42161: process.env.ARBITRUM_RPC_URL || 'https://arb1.arbitrum.io/rpc',
+  137: process.env.POLYGON_RPC_URL || 'https://polygon-bor-rpc.publicnode.com',
+  10: process.env.OPTIMISM_RPC_URL || 'https://mainnet.optimism.io',
+  8453: process.env.BASE_RPC_URL || 'https://mainnet.base.org',
 };
+
+const CACHED_PROVIDERS: Record<number, ethers.JsonRpcProvider> = {};
+
+function getProvider(chainId: number): ethers.JsonRpcProvider {
+  if (!CACHED_PROVIDERS[chainId]) {
+    const url = RPC_FALLBACKS[chainId];
+    CACHED_PROVIDERS[chainId] = new ethers.JsonRpcProvider(url, chainId, { staticNetwork: true });
+  }
+  return CACHED_PROVIDERS[chainId];
+}
 
 export class ProtocolinkClient {
 
@@ -84,7 +94,7 @@ export class ProtocolinkClient {
   }
 
   /**
-   * Consulta cotización On-Chain directa usando el Quoter de Uniswap V3
+   * Consulta cotización On-Chain directa usando el Quoter de Uniswap V3 con proveedor en caché
    */
   async getOnChainUniswapV3Quote(
     chainId: number,
@@ -94,21 +104,23 @@ export class ProtocolinkClient {
     feeTier: number = 500
   ): Promise<DEXQuote | null> {
     const quoterAddress = UNISWAP_V3_QUOTER_ADDRESSES[chainId];
-    const rpcUrl = RPC_FALLBACKS[chainId];
-    if (!quoterAddress || !rpcUrl) return null;
+    if (!quoterAddress) return null;
 
     try {
-      const provider = new ethers.JsonRpcProvider(rpcUrl, chainId, { staticNetwork: true });
+      const provider = getProvider(chainId);
       const quoter = new ethers.Contract(quoterAddress, UNISWAP_V3_QUOTER_ABI, provider);
       const parsedAmountIn = ethers.parseUnits(amountIn, tokenIn.decimals);
       
-      const amountOut = await quoter.quoteExactInputSingle.staticCall(
-        tokenIn.address,
-        tokenOut.address,
-        feeTier,
-        parsedAmountIn,
-        0
-      );
+      const amountOut = await Promise.race([
+        quoter.quoteExactInputSingle.staticCall(
+          tokenIn.address,
+          tokenOut.address,
+          feeTier,
+          parsedAmountIn,
+          0
+        ),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2500))
+      ]);
 
       const formattedOut = ethers.formatUnits(amountOut, tokenOut.decimals);
       const feePercent = feeTier === 500 ? '0.05%' : (feeTier === 3000 ? '0.3%' : '1%');

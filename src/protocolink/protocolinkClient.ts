@@ -206,7 +206,7 @@ export class ProtocolinkClient {
           slippage: 100,
         }).catch(() => null);
         if (quotation) logic = api.protocols.openoceanv2.newSwapTokenLogic(quotation);
-      } else if (protocolId === 'paraswap-v5') {
+      } else if (protocolId === 'velora-v2-all' || protocolId === 'paraswap-v5') {
         quotation = await api.protocols.paraswapv5.getSwapTokenQuotation(chainId, {
           input: { token: apiTokenIn, amount: amountIn },
           tokenOut: apiTokenOut,

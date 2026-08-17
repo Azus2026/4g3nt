@@ -6,7 +6,7 @@ import { CEXFetcher } from '../cex/cexFetcher';
 export class ArbitrageScanner {
   private client: ProtocolinkClient;
   private cexFetcher: CEXFetcher;
-  private supportedProtocols = ['uniswap-v3-0.05%', 'uniswap-v3-0.3%', 'uniswap-v3-1%', 'paraswap-v5', 'openocean-v2'];
+  private supportedProtocols = ['uniswap-v3-0.05%', 'uniswap-v3-0.3%', 'uniswap-v3-1%', 'velora-v2-all', 'paraswap-v5', 'openocean-v2'];
 
   constructor() {
     this.client = new ProtocolinkClient();

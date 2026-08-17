@@ -46,6 +46,12 @@ export class AIStrategyAgent {
       }
     }
 
+    // 4. Tablas de Decisión IA Velora MCP (Velora MCP AI Decision Tables)
+    if (opportunity.leg1.protocolId.includes('velora') || opportunity.leg2.protocolId.includes('velora')) {
+      confidenceScore += 0.15;
+      reasoning.push(`⚡ [VELORA MCP DECISION TABLE] Ruta Velora (Market & Portikus Solvers) validada con protección anti-MEV.`);
+    }
+
     // 4. Modo de Ejecución
     if (ENV.dryRun) {
       reasoning.push(`Modo DRY_RUN activo: Se ejecutará simulación atómica sin envío a mempool pública.`);

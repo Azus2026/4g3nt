@@ -83,7 +83,11 @@ export class AIStrategyAgent {
     const { opportunity, confidenceScore, recommendation, reasoning } = evalResult;
 
     logger.ai(`Análisis para Par: ${opportunity.pairName} (ChainID: ${opportunity.chainId})`);
-    logger.ai(` -> FlashLoan: ${opportunity.flashLoanAmount} ${opportunity.tokenA.symbol}`);
+    if (opportunity.sweetSpotRatio) {
+      logger.ai(` -> 🎯 SWEET SPOT CALCULUS (x*y=k): Tamaño Óptimo ${opportunity.sweetSpotRatio.toFixed(2)}x Base -> ${opportunity.flashLoanAmount} ${opportunity.tokenA.symbol}`);
+    } else {
+      logger.ai(` -> FlashLoan: ${opportunity.flashLoanAmount} ${opportunity.tokenA.symbol}`);
+    }
     logger.ai(` -> Leg 1: Comprar ${opportunity.tokenB.symbol} en [${opportunity.leg1.protocolId.toUpperCase()}] -> Output: ${parseFloat(opportunity.leg1.outputAmount).toFixed(4)}`);
     logger.ai(` -> Leg 2: Vender ${opportunity.tokenB.symbol} en [${opportunity.leg2.protocolId.toUpperCase()}] -> Recibe: ${opportunity.netReturnTokenA} ${opportunity.tokenA.symbol}`);
     logger.ai(` -> Tarifa FlashLoan: ${opportunity.flashLoanFeeAmount} | Gas Est: $${opportunity.estimatedGasUSD.toFixed(2)}`);

@@ -2,6 +2,7 @@ import { ArbitragePair } from '../config/registry';
 import { ENV } from '../config/env';
 import { ProtocolinkClient, DEXQuote, ArbitrageOpportunity } from '../protocolink/protocolinkClient';
 import { CEXFetcher } from '../cex/cexFetcher';
+import { SweetSpotOptimizer } from '../math/sweetSpotOptimizer';
 
 export class ArbitrageScanner {
   private client: ProtocolinkClient;
@@ -16,7 +17,7 @@ export class ArbitrageScanner {
   /**
    * Escanea de forma individual para una cantidad de préstamo específica
    */
-  private async evaluatePairForAmount(pair: ArbitragePair, loanAmountStr: string): Promise<ArbitrageOpportunity | null> {
+  public async evaluatePairForAmount(pair: ArbitragePair, loanAmountStr: string): Promise<ArbitrageOpportunity | null> {
     const { tokenA, tokenB, approxPriceUSD, chainId, cexSymbol } = pair;
 
     // 1. Leg 1: TokenA -> TokenB
@@ -99,25 +100,10 @@ export class ArbitrageScanner {
   }
 
   /**
-   * Búsqueda Binaria del Préstamo Óptimo (Sweet Spot Loan Search)
-   * Probará multiplicadores de préstamo (0.5x, 1.0x, 2.0x) para encontrar el mayor margen USD
+   * Optimización Matemática del Sweet Spot (x*y=k & Golden Section Search)
+   * Calcula la derivada del beneficio respecto al préstamo para encontrar la máxima ganancia neta
    */
   async scanPair(pair: ArbitragePair): Promise<ArbitrageOpportunity | null> {
-    const baseAmountNum = parseFloat(pair.defaultLoanAmount);
-    const candidateAmounts = [
-      (baseAmountNum * 0.5).toString(),
-      baseAmountNum.toString(),
-      (baseAmountNum * 2.0).toString(),
-    ];
-
-    const resultsPromises = candidateAmounts.map(amt => this.evaluatePairForAmount(pair, amt).catch(() => null));
-    const resultsRaw = await Promise.all(resultsPromises);
-    const validResults = resultsRaw.filter((r): r is ArbitrageOpportunity => r !== null);
-
-    if (validResults.length === 0) return null;
-
-    // Seleccionar la oportunidad con mayor Net Profit USD
-    validResults.sort((a, b) => b.netProfitUSD - a.netProfitUSD);
-    return validResults[0];
+    return SweetSpotOptimizer.findOptimalLoan(pair, (amtStr) => this.evaluatePairForAmount(pair, amtStr));
   }
 }

@@ -34,6 +34,7 @@ export interface ArbitrageOpportunity {
   isProfitable: boolean;
   cexReferencePriceUSD?: number;
   cexDEXSpreadPercent?: number;
+  sweetSpotRatio?: number;
 }
 
 const UNISWAP_V3_QUOTER_ABI = [

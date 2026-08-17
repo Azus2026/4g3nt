@@ -6,6 +6,7 @@ import { RPCManager } from '../providers/rpcManager';
 import { SERVER_STATS, LIVE_PAIR_RESULTS, addScanLog } from '../server';
 import { savePersistedStats } from '../utils/statsStore';
 import { logger } from '../utils/logger';
+import { telegramNotifier } from '../notifications/telegramNotifier';
 
 export interface AgentWorkerStatus {
   id: number;
@@ -87,6 +88,7 @@ export class AgentWorker {
               SERVER_STATS.onChainExecutedCount++;
               SERVER_STATS.onChainRealizedPnLUSD += (opp.netProfitUSD > 0 ? opp.netProfitUSD : 0);
               savePersistedStats();
+              await telegramNotifier.notifyExecution(opp, this.definition.name).catch(() => {});
             }
           }
         } else {

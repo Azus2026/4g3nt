@@ -5,6 +5,7 @@ import { RPCManager } from './providers/rpcManager';
 import { SwarmManager } from './cluster/swarmManager';
 import { startServer, setSwarmManager } from './server';
 import { logger } from './utils/logger';
+import { telegramNotifier } from './notifications/telegramNotifier';
 
 async function main() {
   logger.divider();
@@ -37,7 +38,10 @@ async function main() {
   // 3. Iniciar Servidor de API HTTP
   startServer();
 
-  // 4. Arrancar ciclo del Cluster
+  // 4. Notificar a Telegram
+  await telegramNotifier.notifyStartup(MULTI_CHAIN_ARBITRAGE_PAIRS.length, SWARM_AGENTS.length).catch(() => {});
+
+  // 5. Arrancar ciclo del Cluster
   await swarmManager.startSwarmLoop();
 }
 

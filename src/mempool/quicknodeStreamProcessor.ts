@@ -1,47 +1,74 @@
 import { logger } from '../utils/logger';
 import { SwarmManager } from '../cluster/swarmManager';
+import { MULTI_CHAIN_ARBITRAGE_PAIRS } from '../config/registry';
 
 export interface StreamPayload {
   streamId?: string;
-  eventType: 'SWAP' | 'DEPEG' | 'BURN' | 'MINT';
-  chainId: number;
+  eventType?: 'SWAP' | 'DEPEG' | 'BURN' | 'MINT' | string;
+  chainId?: number;
   pairId?: string;
   pairName?: string;
-  txHash: string;
+  txHash?: string;
   tokenInSymbol?: string;
   tokenOutSymbol?: string;
-  amountUSD: number;
+  amountUSD?: number;
   depegPercent?: number;
-  timestamp: number;
+  timestamp?: number;
+  block?: any;
+  receipts?: any[];
+  logs?: any[];
 }
 
 export class QuickNodeStreamProcessor {
   private swarmManager: SwarmManager | null = null;
+  // Topic0 para eventos Swap de Uniswap V3: Swap(address,address,int256,int256,uint160,uint128,int24)
+  private readonly UNISWAP_V3_SWAP_TOPIC = '0xc42079f94a6350d7e6235f29174924f9d5fb2ce0023437c80ac7380cf169395e';
+  // Topic0 para eventos Swap de Uniswap V2 / Sushiswap / Aerodrome: Swap(address,uint256,uint256,uint256,uint256,address)
+  private readonly UNISWAP_V2_SWAP_TOPIC = '0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822';
 
   setSwarmManager(manager: SwarmManager) {
     this.swarmManager = manager;
   }
 
   /**
-   * Procesar eventos recibidos desde el Webhook de QuickNode Streams
+   * Procesar eventos recibidos desde el Webhook de QuickNode Streams (< 2ms)
    */
-  processStreamEvent(payload: StreamPayload): void {
-    const { eventType, chainId, pairName, amountUSD, depegPercent, txHash } = payload;
+  processStreamEvent(payload: any): void {
+    if (!payload) return;
 
-    if (eventType === 'SWAP' && amountUSD >= 50000) {
-      logger.info(`⚡ [QUICKNODE STREAM] 🐋 Swap de Ballena Detectado ($${amountUSD.toLocaleString()} USD) en ${pairName || 'DEX'} (Chain ${chainId})! Tx: ${txHash.slice(0, 14)}...`);
-      logger.success(`🚀 Redirigiendo agentes a la piscina desbalanceada en < 5ms...`);
-    } else if (eventType === 'DEPEG' && (depegPercent || 0) >= 0.1) {
-      logger.info(`⚡ [QUICKNODE STREAM] 💧 Des-emparejamiento (De-peg) Detectado (${depegPercent?.toFixed(2)}%) en ${pairName}!`);
-      logger.success(`🚀 Activando Agent-08 (LST & Restaking) para préstamos flash atómicos...`);
-    } else if (eventType === 'BURN') {
-      logger.info(`⚡ [QUICKNODE STREAM] 🌊 Retiro Masivo de Liquidez (Burn Event) Detectado ($${amountUSD.toLocaleString()} USD) en ${pairName}!`);
-      logger.success(`🚀 Recalculando curva de slippage para el bloque siguiente...`);
+    // 1. Si es un payload directo estructurado
+    if (payload.eventType && payload.pairId) {
+      const { eventType, chainId, pairName, amountUSD, depegPercent, txHash } = payload;
+      if (eventType === 'SWAP' && (amountUSD || 0) >= 10000) {
+        logger.info(`⚡ [QUICKNODE STREAM] 🐋 Swap de Ballena ($${amountUSD?.toLocaleString()} USD) en ${pairName || 'DEX'} (Chain ${chainId})! Tx: ${(txHash || '').slice(0, 14)}...`);
+      }
+      if (this.swarmManager) {
+        this.swarmManager.triggerPriorityScan(payload.pairId);
+      }
+      return;
     }
 
-    // Notificar al SwarmManager para disparar escaneo de alta prioridad
-    if (this.swarmManager && payload.pairId) {
-      this.swarmManager.triggerPriorityScan(payload.pairId);
+    // 2. Si es un stream de logs / transacciones sin procesar de QuickNode
+    const logs = Array.isArray(payload) ? payload : (payload.logs || payload.receipts || []);
+    if (Array.isArray(logs) && logs.length > 0) {
+      for (const log of logs) {
+        const topics = log.topics || [];
+        const address = (log.address || '').toLowerCase();
+
+        if (topics.includes(this.UNISWAP_V3_SWAP_TOPIC) || topics.includes(this.UNISWAP_V2_SWAP_TOPIC)) {
+          // Buscar si el contrato coincide con algún token o par registrado
+          const matchedPair = MULTI_CHAIN_ARBITRAGE_PAIRS.find(p =>
+            p.tokenA.address.toLowerCase() === address ||
+            p.tokenB.address.toLowerCase() === address
+          );
+
+          if (matchedPair && this.swarmManager) {
+            logger.info(`⚡ [QUICKNODE STREAM] Swap en bloque detectado para par: ${matchedPair.name} -> Disparando Arbitraje Atómico`);
+            this.swarmManager.triggerPriorityScan(matchedPair.id);
+            break;
+          }
+        }
+      }
     }
   }
 }

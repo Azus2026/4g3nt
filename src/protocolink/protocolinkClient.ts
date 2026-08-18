@@ -410,7 +410,51 @@ export class ProtocolinkClient {
         logger.warn(`Fallback de construcción del router también falló: ${fallbackErr.message}`);
       }
 
+      // Fallback Directo de Ejecución de Swap Nativo
+      const directTx = await this.buildDirectParaSwapTransaction(account, chainId, leg1.inputToken, leg1.outputToken, leg1.inputAmount);
+      if (directTx && directTx.to && directTx.data) {
+        logger.success(`✅ Router Payload generado exitosamente vía ParaSwap Direct Gateway.`);
+        return {
+          logics,
+          routerData: directTx,
+        };
+      }
+
       return { logics, routerData: null };
+    }
+  }
+
+  /**
+   * Construye transacción de Swap directa con la API nativa de ParaSwap
+   */
+  async buildDirectParaSwapTransaction(
+    account: string,
+    chainId: number,
+    tokenIn: TokenConfig,
+    tokenOut: TokenConfig,
+    amountIn: string
+  ): Promise<any | null> {
+    try {
+      const rawAmount = ethers.parseUnits(amountIn, tokenIn.decimals).toString();
+      const priceUrl = `https://apiv5.paraswap.io/prices/?srcToken=${tokenIn.address}&destToken=${tokenOut.address}&amount=${rawAmount}&srcDecimals=${tokenIn.decimals}&destDecimals=${tokenOut.decimals}&side=SELL&network=${chainId}&excludeDEXS=Dexalot`;
+      const res = await axios.get(priceUrl, { timeout: 3000 });
+      const priceRoute = res.data.priceRoute;
+      if (!priceRoute) return null;
+
+      const txBuildUrl = `https://apiv5.paraswap.io/transactions/${chainId}?ignoreChecks=true`;
+      const txRes = await axios.post(txBuildUrl, {
+        srcToken: tokenIn.address,
+        destToken: tokenOut.address,
+        srcAmount: rawAmount,
+        destAmount: priceRoute.destAmount,
+        priceRoute,
+        userAddress: account,
+        partner: 'paraswap',
+      }, { timeout: 3000 });
+
+      return txRes.data;
+    } catch {
+      return null;
     }
   }
 }

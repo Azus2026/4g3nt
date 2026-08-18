@@ -175,8 +175,10 @@ export class ProtocolinkClient {
     return null;
   }
 
+  private quoteCache: Map<string, { quote: DEXQuote | null; expiresAt: number }> = new Map();
+
   /**
-   * Consulta cotizaciones de Swap en DEXs por cadena
+   * Consulta cotizaciones de Swap en DEXs por cadena con caché inteligente de 2.5s
    */
   async getSwapQuotation(
     protocolId: string,
@@ -185,15 +187,30 @@ export class ProtocolinkClient {
     tokenOut: TokenConfig,
     amountIn: string
   ): Promise<DEXQuote | null> {
+    const cacheKey = `${protocolId}-${chainId}-${tokenIn.address.toLowerCase()}-${tokenOut.address.toLowerCase()}-${amountIn}`;
+    const cached = this.quoteCache.get(cacheKey);
+    const now = Date.now();
+    if (cached && cached.expiresAt > now) {
+      return cached.quote;
+    }
+
     try {
       if (protocolId === 'uniswap-v3-0.05%') {
-        return await this.getOnChainUniswapV3Quote(chainId, tokenIn, tokenOut, amountIn, 500);
+        const q = await this.getOnChainUniswapV3Quote(chainId, tokenIn, tokenOut, amountIn, 500);
+        this.quoteCache.set(cacheKey, { quote: q, expiresAt: now + 2500 });
+        return q;
       } else if (protocolId === 'uniswap-v3-0.3%') {
-        return await this.getOnChainUniswapV3Quote(chainId, tokenIn, tokenOut, amountIn, 3000);
+        const q = await this.getOnChainUniswapV3Quote(chainId, tokenIn, tokenOut, amountIn, 3000);
+        this.quoteCache.set(cacheKey, { quote: q, expiresAt: now + 2500 });
+        return q;
       } else if (protocolId === 'uniswap-v3-1%') {
-        return await this.getOnChainUniswapV3Quote(chainId, tokenIn, tokenOut, amountIn, 10000);
+        const q = await this.getOnChainUniswapV3Quote(chainId, tokenIn, tokenOut, amountIn, 10000);
+        this.quoteCache.set(cacheKey, { quote: q, expiresAt: now + 2500 });
+        return q;
       } else if (protocolId === 'kyberswap-v1') {
-        return await this.getKyberSwapQuote(chainId, tokenIn, tokenOut, amountIn);
+        const q = await this.getKyberSwapQuote(chainId, tokenIn, tokenOut, amountIn);
+        this.quoteCache.set(cacheKey, { quote: q, expiresAt: now + 2500 });
+        return q;
       }
 
       let quotation: any = null;
@@ -230,7 +247,7 @@ export class ProtocolinkClient {
       }
 
       if (quotation && quotation.output && quotation.output.amount) {
-        return {
+        const resultQuote: DEXQuote = {
           protocolId,
           chainId,
           inputToken: tokenIn,
@@ -239,11 +256,14 @@ export class ProtocolinkClient {
           outputAmount: quotation.output.amount,
           logic,
         };
+        this.quoteCache.set(cacheKey, { quote: resultQuote, expiresAt: now + 2500 });
+        return resultQuote;
       }
     } catch {
       // Ignorar errores de ruta
     }
 
+    this.quoteCache.set(cacheKey, { quote: null, expiresAt: now + 2000 });
     return null;
   }
 

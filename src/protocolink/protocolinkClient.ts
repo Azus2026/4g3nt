@@ -35,6 +35,7 @@ export interface ArbitrageOpportunity {
   cexReferencePriceUSD?: number;
   cexDEXSpreadPercent?: number;
   sweetSpotRatio?: number;
+  tokenAPriceUSD?: number;
 }
 
 const UNISWAP_V3_QUOTER_ABI = [
@@ -223,7 +224,7 @@ export class ProtocolinkClient {
           quotation = await api.protocols.uniswapv3.getSwapTokenQuotation(chainId, {
             input: { token: apiTokenIn, amount: amountIn },
             tokenOut: apiTokenOut,
-            slippage: 100,
+            slippage: ENV.slippageBps,
           });
           logic = api.protocols.uniswapv3.newSwapTokenLogic(quotation);
         } catch {
@@ -233,14 +234,14 @@ export class ProtocolinkClient {
         quotation = await api.protocols.openoceanv2.getSwapTokenQuotation(chainId, {
           input: { token: apiTokenIn, amount: amountIn },
           tokenOut: apiTokenOut,
-          slippage: 100,
+          slippage: ENV.slippageBps,
         }).catch(() => null);
         if (quotation) logic = api.protocols.openoceanv2.newSwapTokenLogic(quotation);
       } else if (protocolId === 'velora-v2-all' || protocolId === 'paraswap-v5') {
         quotation = await api.protocols.paraswapv5.getSwapTokenQuotation(chainId, {
           input: { token: apiTokenIn, amount: amountIn },
           tokenOut: apiTokenOut,
-          slippage: 100,
+          slippage: ENV.slippageBps,
           excludeDEXS: ['Dexalot', 'Dexalot-42161'],
         } as any).catch(() => null);
         if (quotation) logic = api.protocols.paraswapv5.newSwapTokenLogic(quotation);
@@ -351,14 +352,14 @@ export class ProtocolinkClient {
         const psQuote1 = await api.protocols.paraswapv5.getSwapTokenQuotation(chainId, {
           input: { token: this.toApiToken(leg1.inputToken), amount: leg1.inputAmount },
           tokenOut: this.toApiToken(leg1.outputToken),
-          slippage: 100,
+          slippage: ENV.slippageBps,
           excludeDEXS: ['Dexalot', 'Dexalot-42161'],
         } as any).catch(() => null);
 
         const psQuote2 = psQuote1 ? await api.protocols.paraswapv5.getSwapTokenQuotation(chainId, {
           input: { token: this.toApiToken(leg2.inputToken), amount: psQuote1.output.amount },
           tokenOut: this.toApiToken(leg2.outputToken),
-          slippage: 100,
+          slippage: ENV.slippageBps,
           excludeDEXS: ['Dexalot', 'Dexalot-42161'],
         } as any).catch(() => null) : null;
 
@@ -382,13 +383,13 @@ export class ProtocolinkClient {
         const uniQuote1 = await api.protocols.uniswapv3.getSwapTokenQuotation(chainId, {
           input: { token: this.toApiToken(leg1.inputToken), amount: leg1.inputAmount },
           tokenOut: this.toApiToken(leg1.outputToken),
-          slippage: 100,
+          slippage: ENV.slippageBps,
         }).catch(() => null);
 
         const uniQuote2 = uniQuote1 ? await api.protocols.uniswapv3.getSwapTokenQuotation(chainId, {
           input: { token: this.toApiToken(leg2.inputToken), amount: uniQuote1.output.amount },
           tokenOut: this.toApiToken(leg2.outputToken),
-          slippage: 100,
+          slippage: ENV.slippageBps,
         }).catch(() => null) : null;
 
         if (uniQuote1 && uniQuote2) {
@@ -410,51 +411,10 @@ export class ProtocolinkClient {
         logger.warn(`Fallback de construcción del router también falló: ${fallbackErr.message}`);
       }
 
-      // Fallback Directo de Ejecución de Swap Nativo
-      const directTx = await this.buildDirectParaSwapTransaction(account, chainId, leg1.inputToken, leg1.outputToken, leg1.inputAmount);
-      if (directTx && directTx.to && directTx.data) {
-        logger.success(`✅ Router Payload generado exitosamente vía ParaSwap Direct Gateway.`);
-        return {
-          logics,
-          routerData: directTx,
-        };
-      }
-
+      // Sin fallback de swap directo: una transacción de una sola pierna sin flash loan
+      // no es un arbitraje atómico y gastaría fondos propios de la wallet.
+      logger.warn(`No fue posible construir una transacción atómica de arbitraje. Se descarta la oportunidad.`);
       return { logics, routerData: null };
-    }
-  }
-
-  /**
-   * Construye transacción de Swap directa con la API nativa de ParaSwap
-   */
-  async buildDirectParaSwapTransaction(
-    account: string,
-    chainId: number,
-    tokenIn: TokenConfig,
-    tokenOut: TokenConfig,
-    amountIn: string
-  ): Promise<any | null> {
-    try {
-      const rawAmount = ethers.parseUnits(amountIn, tokenIn.decimals).toString();
-      const priceUrl = `https://apiv5.paraswap.io/prices/?srcToken=${tokenIn.address}&destToken=${tokenOut.address}&amount=${rawAmount}&srcDecimals=${tokenIn.decimals}&destDecimals=${tokenOut.decimals}&side=SELL&network=${chainId}&excludeDEXS=Dexalot`;
-      const res = await axios.get(priceUrl, { timeout: 3000 });
-      const priceRoute = res.data.priceRoute;
-      if (!priceRoute) return null;
-
-      const txBuildUrl = `https://apiv5.paraswap.io/transactions/${chainId}?ignoreChecks=true`;
-      const txRes = await axios.post(txBuildUrl, {
-        srcToken: tokenIn.address,
-        destToken: tokenOut.address,
-        srcAmount: rawAmount,
-        destAmount: priceRoute.destAmount,
-        priceRoute,
-        userAddress: account,
-        partner: 'paraswap',
-      }, { timeout: 3000 });
-
-      return txRes.data;
-    } catch {
-      return null;
     }
   }
 }

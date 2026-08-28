@@ -3,6 +3,7 @@ import { ENV } from '../config/env';
 import { ProtocolinkClient, DEXQuote, ArbitrageOpportunity } from '../protocolink/protocolinkClient';
 import { CEXFetcher } from '../cex/cexFetcher';
 import { SweetSpotOptimizer } from '../math/sweetSpotOptimizer';
+import { priceService } from '../prices/priceService';
 
 export class ArbitrageScanner {
   private client: ProtocolinkClient;
@@ -18,7 +19,8 @@ export class ArbitrageScanner {
    * Escanea de forma individual para una cantidad de préstamo específica
    */
   public async evaluatePairForAmount(pair: ArbitragePair, loanAmountStr: string): Promise<ArbitrageOpportunity | null> {
-    const { tokenA, tokenB, approxPriceUSD, chainId, cexSymbol } = pair;
+    const { tokenA, tokenB, chainId, cexSymbol } = pair;
+    const tokenAPriceUSD = await priceService.getTokenAUsd(pair);
 
     // 1. Leg 1: TokenA -> TokenB
     const leg1QuotesPromises = this.supportedProtocols.map(proto =>
@@ -53,27 +55,25 @@ export class ArbitrageScanner {
       const cexInfo = await this.cexFetcher.getAggregatedCEXPrice(cexSymbol).catch(() => ({ avgPrice: 0 }));
       if (cexInfo.avgPrice > 0) {
         cexAvgPriceUSD = cexInfo.avgPrice;
-        const dexImpliedPrice = (parseFloat(loanAmountStr) * approxPriceUSD) / parseFloat(bestLeg1.outputAmount);
+        const dexImpliedPrice = (parseFloat(loanAmountStr) * tokenAPriceUSD) / parseFloat(bestLeg1.outputAmount);
         cexSpreadPercent = Math.abs(((dexImpliedPrice - cexAvgPriceUSD) / cexAvgPriceUSD) * 100);
       }
     }
 
-    // 4. Balancer 0.00% Flash Loan Fee vs Aave 0.05%
-    const isBalancerSupported = chainId === 1 || chainId === 137 || chainId === 42161;
-    const flashLoanFeeRate = isBalancerSupported ? 0.00 : 0.0005;
+    // 4. Tarifa del flash loan según el proveedor realmente configurado:
+    // Balancer V2 cobra 0% (solo soportado en Ethereum y Arbitrum); Aave V3 cobra 0.05%.
+    const usesBalancer = ENV.flashLoanProvider === 'balancerv2' && (chainId === 1 || chainId === 42161);
+    const flashLoanFeeRate = usesBalancer ? 0.00 : 0.0005;
     const loanNum = parseFloat(loanAmountStr);
     const flashLoanFeeNum = loanNum * flashLoanFeeRate;
     const totalRequiredToRepay = loanNum + flashLoanFeeNum;
 
     const returnTokenANum = parseFloat(bestLeg2.outputAmount);
     const grossProfitTokenA = returnTokenANum - totalRequiredToRepay;
-    const grossProfitUSD = grossProfitTokenA * approxPriceUSD;
+    const grossProfitUSD = grossProfitTokenA * tokenAPriceUSD;
 
-    // Estimación Gas
-    const gasUnits = chainId === 1 ? 350000 : 150000;
-    const gweiPrice = chainId === 1 ? 20 : 0.1;
-    const estimatedGasEth = (gasUnits * gweiPrice * 1e-9);
-    const estimatedGasUSD = estimatedGasEth * (pair.id.includes('WETH') ? approxPriceUSD : 3000);
+    // Estimación de gas con gasPrice on-chain y precio USD real del token nativo
+    const estimatedGasUSD = await priceService.estimateGasUsd(chainId);
 
     const netProfitUSD = grossProfitUSD - estimatedGasUSD;
     const isProfitable = netProfitUSD >= ENV.minProfitUSD;
@@ -96,6 +96,7 @@ export class ArbitrageScanner {
       isProfitable,
       cexReferencePriceUSD: cexAvgPriceUSD,
       cexDEXSpreadPercent: cexSpreadPercent,
+      tokenAPriceUSD,
     };
   }
 

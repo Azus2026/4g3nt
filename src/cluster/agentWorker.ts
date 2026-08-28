@@ -88,10 +88,13 @@ export class AgentWorker {
                 }
 
                 this.status = 'EXECUTING';
-                const executed = await this.executor.execute(opp);
-                if (executed) {
+                const result = await this.executor.execute(opp);
+                if (result.success) {
                   SERVER_STATS.onChainExecutedCount++;
-                  SERVER_STATS.onChainRealizedPnLUSD += (opp.netProfitUSD > 0 ? opp.netProfitUSD : 0);
+                  // PnL realizado medido on-chain (diferencia real de balance), no la estimación
+                  if (result.realizedProfitTokenA !== null && opp.tokenAPriceUSD) {
+                    SERVER_STATS.onChainRealizedPnLUSD += result.realizedProfitTokenA * opp.tokenAPriceUSD;
+                  }
                   savePersistedStats();
                   await telegramNotifier.notifyExecution(opp, this.definition.name).catch(() => {});
                 }

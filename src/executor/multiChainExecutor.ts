@@ -13,6 +13,13 @@ const FLASHBOTS_RPC_MAP: Record<number, string> = {
   8453: 'https://mainnet.base.org',
 };
 
+const ERC20_BALANCE_ABI = ['function balanceOf(address) view returns (uint256)'];
+
+export interface ExecutionResult {
+  success: boolean;
+  realizedProfitTokenA: number | null; // Diferencia real de balance de tokenA (puede ser negativa)
+}
+
 export class MultiChainExecutor {
   private rpcManager: RPCManager;
   private protocolinkClient: ProtocolinkClient;
@@ -25,7 +32,7 @@ export class MultiChainExecutor {
   /**
    * Ejecuta o simula la transacción de arbitraje en la cadena objetivo
    */
-  async execute(opportunity: ArbitrageOpportunity): Promise<boolean> {
+  async execute(opportunity: ArbitrageOpportunity): Promise<ExecutionResult> {
     const provider = this.rpcManager.getProvider(opportunity.chainId);
     let wallet: ethers.Wallet | null = null;
 
@@ -54,7 +61,7 @@ export class MultiChainExecutor {
 
     if (!routerData) {
       logger.error(`Falló la construcción de datos del Router de Protocolink.`);
-      return false;
+      return { success: false, realizedProfitTokenA: null };
     }
 
     const toAddress = String(routerData.to);
@@ -76,17 +83,27 @@ export class MultiChainExecutor {
 
         const result = await provider.call(txRequest);
         logger.success(`[DRY-RUN] Simulación exitosa en ChainID ${opportunity.chainId}! Return call: ${result.slice(0, 18)}...`);
-        return true;
+        return { success: true, realizedProfitTokenA: null };
       } catch (err: any) {
         logger.warn(`[DRY-RUN] Simulación eth_call devuelta con revert (posible falta de liquidez en bloque): ${err.message}`);
-        return false;
+        return { success: false, realizedProfitTokenA: null };
       }
     }
 
     // 3. Ejecución real protegida en red con wallet conectada a RPC de alta velocidad
     if (!wallet) {
       logger.error(`No se configuró PRIVATE_KEY válida para transmitir en red real.`);
-      return false;
+      return { success: false, realizedProfitTokenA: null };
+    }
+
+    // 3b. Simulación obligatoria antes de enviar en LIVE: si la eth_call revierte,
+    // la transacción on-chain también revertiría y se pagaría el gas igualmente.
+    try {
+      await provider.call({ to: toAddress, data: dataHex, value: valueHex, from: accountAddress });
+    } catch (err: any) {
+      logger.warn(`[PRE-LIVE] La simulación eth_call revirtió; se aborta el envío para no quemar gas: ${err.message}`);
+      addScanLog(`⚠️ [PRE-LIVE] Simulación revertida, envío abortado (${opportunity.pairName}).`);
+      return { success: false, realizedProfitTokenA: null };
     }
 
     return await executeWithNonceLock(opportunity.chainId, async () => {
@@ -95,6 +112,10 @@ export class MultiChainExecutor {
 
         const activeWallet = wallet.connect(provider);
         const pendingNonce = await activeWallet.getNonce('pending');
+
+        // Balance real de tokenA antes de ejecutar, para medir el PnL realizado
+        const tokenAContract = new ethers.Contract(opportunity.tokenA.address, ERC20_BALANCE_ABI, provider);
+        const balanceBefore: bigint = await tokenAContract.balanceOf(accountAddress).catch(() => 0n);
 
         // Obtener datos de gas EIP-1559 en tiempo real con propina de prioridad (Priority Fee Bribing)
         const feeData = await provider.getFeeData().catch(() => null);
@@ -151,16 +172,26 @@ export class MultiChainExecutor {
           const explorerUrl = (explorerMap[opportunity.chainId] || 'https://etherscan.io/tx/') + tx.hash;
           logger.success(`🎉 Transacción confirmada en bloque #${receipt.blockNumber}! Explorer: ${explorerUrl}`);
           addScanLog(`🎉 [CONFIRMADA] Arbitraje Ejecutado Bloque #${receipt.blockNumber} | Explorer: ${explorerUrl}`);
-          return true;
+
+          // PnL realizado = diferencia real de balance de tokenA (no la estimación del scáner)
+          let realizedProfitTokenA: number | null = null;
+          try {
+            const balanceAfter: bigint = await tokenAContract.balanceOf(accountAddress);
+            realizedProfitTokenA = parseFloat(ethers.formatUnits(balanceAfter - balanceBefore, opportunity.tokenA.decimals));
+            addScanLog(`📊 PnL realizado: ${realizedProfitTokenA.toFixed(6)} ${opportunity.tokenA.symbol}`);
+          } catch {
+            // Si no se puede leer el balance, no se reporta PnL realizado
+          }
+          return { success: true, realizedProfitTokenA };
         } else {
           logger.error(`Transacción revertida en bloque #${receipt?.blockNumber || 'desconocido'}.`);
-          addScanLog(`❌ Transacción de arbitraje revertida sin costo en gas.`);
-          return false;
+          addScanLog(`❌ Transacción de arbitraje revertida on-chain (el gas de la transacción sí se paga).`);
+          return { success: false, realizedProfitTokenA: null };
         }
       } catch (err: any) {
         logger.error(`Error en ejecución live: ${err.message}`);
         addScanLog(`❌ Error en transmisión live: ${err.message}`);
-        return false;
+        return { success: false, realizedProfitTokenA: null };
       }
     });
   }

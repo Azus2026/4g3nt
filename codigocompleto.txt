@@ -1,7 +1,7 @@
 ===============================================================================
   SISTEMA COMPLETO DE ARBITRAJE MEV CON FLASH LOANS (ARBITRUM & BASE)
   CÓDIGO FUENTE AUDITADO, ESTRUCTURADO Y CORREGIDO (FASES 1 A 5 COMPLETADAS)
-  Fecha de Generación: 2026-10-15T23:10:11.263Z
+  Fecha de Generación: 2026-10-15T23:20:33.779Z
 ===============================================================================
 
 ÍNDICE GENERAL DE ARCHIVOS INCLUIDOS:
@@ -1137,6 +1137,7 @@ contract FlashLoanArbitrageReceiver is IFlashLoanSimpleReceiver, ReentrancyGuard
     "test:fork": "npx hardhat run scripts/test_fork_simulation.ts",
     "deploy:base": "npx hardhat run scripts/deployBase.ts --network base",
     "deploy:arbitrum": "npx hardhat run scripts/deployArbitrum.ts --network arbitrum",
+    "generate:wallet": "node scripts/generate_production_wallet.js",
     "start": "node --max-old-space-size=4096 dist/src/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "server": "ts-node src/server.ts"

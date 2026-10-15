@@ -1,7 +1,6 @@
 import { AgentDefinition, ArbitragePair } from '../config/registry';
 import { ArbitrageScanner } from '../agent/arbitrageScanner';
-import { AIStrategyAgent } from '../agent/aiStrategyAgent';
-import { SweetSpotOptimizer } from '../agent/sweetSpotOptimizer';
+import { SweetSpotOptimizer } from '../math/sweetSpotOptimizer';
 import { MultiChainExecutor } from '../executor/multiChainExecutor';
 import { ArbitrageOpportunity } from '../protocolink/protocolinkClient';
 import { RPCManager } from '../providers/rpcManager';
@@ -30,7 +29,6 @@ import { flashBundleAccumulator } from '../executor/flashBundleAccumulator';
 import { ENV } from '../config/env';
 import { logger } from '../utils/logger';
 import { telegramNotifier } from '../notifications/telegramNotifier';
-import { TriangularScanner } from '../triangular/triangularScanner';
 import { TRIANGULAR_CYCLES, TriangularCycle } from '../triangular/triangularRegistry';
 
 export interface AgentWorkerStatus {
@@ -51,8 +49,6 @@ export class AgentWorker {
   public assignedPairs: ArbitragePair[];
   public assignedTriangularCycles: TriangularCycle[] = [];
   private scanner: ArbitrageScanner;
-  private triScanner: TriangularScanner;
-  private aiAgent: AIStrategyAgent;
   private executor: MultiChainExecutor;
 
   public scansCount: number = 0;
@@ -69,8 +65,6 @@ export class AgentWorker {
     this.definition = definition;
     this.assignedPairs = assignedPairs;
     this.scanner = new ArbitrageScanner();
-    this.triScanner = new TriangularScanner();
-    this.aiAgent = new AIStrategyAgent();
     this.executor = executor;
 
     // Asignar ciclos triangulares correspondientes a este agente
@@ -133,10 +127,14 @@ export class AgentWorker {
       const p2 = bestP2;
       const proto2Name = bestProto2;
       const spread = maxSpread;
-      const gasCostUSD = (pair.chainId === 8453 || pair.chainId === 137) ? 0.0003
-                       : (pair.chainId === 42161 || pair.chainId === 81457 || pair.chainId === 59144 || pair.chainId === 534352) ? 0.0008
-                       : (pair.chainId === 56 || pair.chainId === 43114 || pair.chainId === 10) ? 0.003
-                       : 2.50;
+      const gasCalc = SweetSpotOptimizer.calculateTotalGasCostUSD(
+        pair.chainId,
+        160_000n,
+        0.05,
+        pair.approxPriceUSD || 2500,
+        384
+      );
+      const gasCostUSD = gasCalc.totalGasUSD;
 
       const depth1 = p1 ? Number(p1.liquidity) / 1e18 : 1.0;
       const depth2 = p2 ? Number(p2.liquidity) / 1e18 : 1.0;

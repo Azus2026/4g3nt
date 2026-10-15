@@ -3,6 +3,7 @@ import { ENV } from '../config/env';
 import { logger } from '../utils/logger';
 import { SERVER_STATS, addScanLog, addFlashOpportunity } from '../server';
 import { savePersistedStats } from '../utils/statsStore';
+import { SweetSpotOptimizer } from '../math/sweetSpotOptimizer';
 
 // Contrato Universal de Arbitraje Desplegado en Arbitrum One (ChainID 42161)
 export const ARBITRAGE_CONTRACT_ARBITRUM = ENV.arbitrageContractArbitrum || '0xfD164F1b738FE3594C33A569Aa4F21D1855A47E2';
@@ -248,14 +249,27 @@ export class ArbitrumExecutor {
 
       const pathDesc = `${ARB_DEX_NAMES[buyDex]} ➔ ${ARB_DEX_NAMES[sellDex]}`;
 
-      // 1. Algoritmo de Tamaño Óptimo: Evaluar curva de liquidez
+      // 1. Algoritmo de Tamaño Óptimo: Balancer V2 (0% Fee) y Aave V3 fallback
       let profitableFlashAmount: bigint | null = null;
+      let isBalancer = false;
       for (const fAmount of ARB_DYNAMIC_LOAN_TIERS) {
         try {
-          await this.arbitrageContract.executeFlashLoanSpatial.staticCall(routeStruct, fAmount);
+          await this.arbitrageContract.executeBalancerFlashLoanSpatial.staticCall(routeStruct, fAmount);
           profitableFlashAmount = fAmount;
+          isBalancer = true;
           break;
         } catch {}
+      }
+
+      if (!profitableFlashAmount) {
+        for (const fAmount of ARB_DYNAMIC_LOAN_TIERS) {
+          try {
+            await this.arbitrageContract.executeFlashLoanSpatial.staticCall(routeStruct, fAmount);
+            profitableFlashAmount = fAmount;
+            isBalancer = false;
+            break;
+          } catch {}
+        }
       }
 
       // 2. Calcular Spread Dinámico en Vivo de Arbitrum
@@ -272,7 +286,10 @@ export class ArbitrumExecutor {
       const formattedSpread = parseFloat(dynamicSpread.toFixed(3));
       const loanUSD = profitableFlashAmount ? (parseFloat(ethers.formatEther(profitableFlashAmount)) * 2500) : 25000.0;
       const grossUSD = parseFloat(((loanUSD * formattedSpread) / 100).toFixed(2));
-      const netUSD = profitableFlashAmount ? parseFloat((grossUSD - (loanUSD * 0.0010) - 0.05).toFixed(2)) : 0;
+      const arbGasEst = SweetSpotOptimizer.calculateTotalGasCostUSD(42161, 280_000n, 0.1, 2500, 384);
+      const netUSD = profitableFlashAmount 
+        ? parseFloat((grossUSD - (loanUSD * (isBalancer ? 0.0003 : 0.0010)) - arbGasEst.totalGasUSD).toFixed(2)) 
+        : 0;
 
       addFlashOpportunity({
         pairName: `${pairName} (Arbitrum)`,
@@ -294,12 +311,13 @@ export class ArbitrumExecutor {
       // 🚀 DISPARO ON-CHAIN SI LA SIMULACIÓN ARROJA BENEFICIO NETO EN ARBITRUM
       if (profitableFlashAmount) {
         this.isExecuting = true;
-        logger.success(`🔥 [FLASH LOAN ARBITRUM DETECTADO] Oportunidad en ${pairName} (${pathDesc}) con ${ethers.formatEther(profitableFlashAmount)} WETH!`);
-        addScanLog(`🚀 [DISPARO ON-CHAIN ARBITRUM] Flash Loan ${pairName} (${pathDesc}) con ${ethers.formatEther(profitableFlashAmount)} WETH...`, 'FLASH_LOAN');
+        const providerName = isBalancer ? 'Balancer V2 (0% Fee)' : 'Aave V3';
+        logger.success(`🔥 [FLASH LOAN ${providerName} ARBITRUM DETECTADO] Oportunidad en ${pairName} (${pathDesc}) con ${ethers.formatEther(profitableFlashAmount)} WETH!`);
+        addScanLog(`🚀 [DISPARO ON-CHAIN ARBITRUM] Flash Loan ${providerName} ${pairName} (${pathDesc}) con ${ethers.formatEther(profitableFlashAmount)} WETH...`, 'FLASH_LOAN');
 
-        const tx = await this.arbitrageContract.executeFlashLoanSpatial(routeStruct, profitableFlashAmount, {
-          gasLimit: 800000,
-        });
+        const tx = isBalancer
+          ? await this.arbitrageContract.executeBalancerFlashLoanSpatial(routeStruct, profitableFlashAmount, { gasLimit: 750000 })
+          : await this.arbitrageContract.executeFlashLoanSpatial(routeStruct, profitableFlashAmount, { gasLimit: 750000 });
 
         logger.info(`⚡ Tx Enviada a Arbitrum: https://arbiscan.io/tx/${tx.hash}`);
         const receipt = await tx.wait(1);
@@ -372,12 +390,25 @@ export class ArbitrumExecutor {
       const pathDesc = `${ARB_DEX_NAMES[dex1]} ➔ ${ARB_DEX_NAMES[dex2]} ➔ ${ARB_DEX_NAMES[dex3]}`;
 
       let profitableFlashAmount: bigint | null = null;
+      let isBalancer = false;
       for (const fAmount of ARB_DYNAMIC_LOAN_TIERS) {
         try {
-          await this.arbitrageContract.executeFlashLoanTriangular.staticCall(routeStruct, fAmount);
+          await this.arbitrageContract.executeBalancerFlashLoanTriangular.staticCall(routeStruct, fAmount);
           profitableFlashAmount = fAmount;
+          isBalancer = true;
           break;
         } catch {}
+      }
+
+      if (!profitableFlashAmount) {
+        for (const fAmount of ARB_DYNAMIC_LOAN_TIERS) {
+          try {
+            await this.arbitrageContract.executeFlashLoanTriangular.staticCall(routeStruct, fAmount);
+            profitableFlashAmount = fAmount;
+            isBalancer = false;
+            break;
+          } catch {}
+        }
       }
 
       const triNow = Date.now();
@@ -393,7 +424,10 @@ export class ArbitrumExecutor {
       const formattedTriSpread = parseFloat(dynamicTriSpread.toFixed(3));
       const loanUSD = profitableFlashAmount ? (parseFloat(ethers.formatEther(profitableFlashAmount)) * 2500) : 25000.0;
       const triGrossUSD = parseFloat(((loanUSD * formattedTriSpread) / 100).toFixed(2));
-      const triNetUSD = profitableFlashAmount ? parseFloat((triGrossUSD - (loanUSD * 0.0015) - 0.06).toFixed(2)) : 0;
+      const triGasEst = SweetSpotOptimizer.calculateTotalGasCostUSD(42161, 350_000n, 0.1, 2500, 512);
+      const triNetUSD = profitableFlashAmount 
+        ? parseFloat((triGrossUSD - (loanUSD * (isBalancer ? 0.0005 : 0.0015)) - triGasEst.totalGasUSD).toFixed(2)) 
+        : 0;
 
       addFlashOpportunity({
         pairName: `[3-LEG] ${pairName} (Arbitrum)`,
@@ -406,6 +440,7 @@ export class ArbitrumExecutor {
         protocolB: ARB_DEX_NAMES[dex2].toLowerCase(),
         spreadPercent: formattedTriSpread,
         grossProfitUSD: triGrossUSD,
+        gasCostUSD: triGasEst.totalGasUSD,
         netProfitUSD: triNetUSD,
         timestamp: Date.now(),
         isProfitable: !!profitableFlashAmount,
@@ -414,12 +449,13 @@ export class ArbitrumExecutor {
 
       if (profitableFlashAmount) {
         this.isExecuting = true;
-        logger.success(`🔥 [TRIANGULAR ARBITRUM DETECTADO] ${pairName} con ${ethers.formatEther(profitableFlashAmount)} WETH!`);
-        addScanLog(`🚀 [DISPARO TRIANGULAR ARBITRUM] ${pairName}...`, 'FLASH_LOAN');
+        const providerName = isBalancer ? 'Balancer V2 (0% Fee)' : 'Aave V3';
+        logger.success(`🔥 [TRIANGULAR ${providerName} ARBITRUM DETECTADO] ${pairName} con ${ethers.formatEther(profitableFlashAmount)} WETH!`);
+        addScanLog(`🚀 [DISPARO TRIANGULAR ${providerName} ARBITRUM] ${pairName}...`, 'FLASH_LOAN');
 
-        const tx = await this.arbitrageContract.executeFlashLoanTriangular(routeStruct, profitableFlashAmount, {
-          gasLimit: 950000
-        });
+        const tx = isBalancer
+          ? await this.arbitrageContract.executeBalancerFlashLoanTriangular(routeStruct, profitableFlashAmount, { gasLimit: 950000 })
+          : await this.arbitrageContract.executeFlashLoanTriangular(routeStruct, profitableFlashAmount, { gasLimit: 950000 });
 
         const receipt = await tx.wait(1);
         if (receipt && receipt.status === 1) {

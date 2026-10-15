@@ -277,6 +277,24 @@ contract ArbitrumUniversalArbitrage is IFlashLoanSimpleReceiver, IFlashLoanRecip
         IPool(AAVE_POOL).flashLoanSimple(address(this), route.tokenA, loanAmount, params, 0);
     }
 
+    function executeBalancerFlashLoanSpatial(SpatialRoute calldata route, uint256 loanAmount) external onlyOwner {
+        IERC20[] memory tokens = new IERC20[](1);
+        tokens[0] = IERC20(route.tokenIn);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = loanAmount;
+        bytes memory userData = abi.encode(uint8(0), abi.encode(route));
+        IBalancerVault(BALANCER_VAULT).flashLoan(address(this), tokens, amounts, userData);
+    }
+
+    function executeBalancerFlashLoanTriangular(TriangularRoute calldata route, uint256 loanAmount) external onlyOwner {
+        IERC20[] memory tokens = new IERC20[](1);
+        tokens[0] = IERC20(route.tokenA);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = loanAmount;
+        bytes memory userData = abi.encode(uint8(1), abi.encode(route));
+        IBalancerVault(BALANCER_VAULT).flashLoan(address(this), tokens, amounts, userData);
+    }
+
     function executeOperation(
         address asset,
         uint256 amount,
@@ -344,6 +362,23 @@ contract ArbitrumUniversalArbitrage is IFlashLoanSimpleReceiver, IFlashLoanRecip
             SpatialRoute memory route = abi.decode(routeData, (SpatialRoute));
             uint256 interAmount = _swap(route.tokenIn, route.tokenIntermediate, amount, route.dexBuy, route.feeOrSpacingBuy);
             _swap(route.tokenIntermediate, route.tokenIn, interAmount, route.dexSell, route.feeOrSpacingSell);
+
+            uint256 currentBalance = IERC20(asset).balanceOf(address(this));
+            if (currentBalance < amountOwed + route.minProfit) {
+                revert NotProfitable(currentBalance, amountOwed + route.minProfit);
+            }
+
+            IERC20(asset).safeTransfer(BALANCER_VAULT, amountOwed);
+            uint256 netProfit = currentBalance - amountOwed;
+            if (netProfit > 0) {
+                IERC20(asset).safeTransfer(owner, netProfit);
+            }
+            emit FlashLoanExecuted(asset, amount, feeAmounts[0], netProfit);
+        } else if (routeType == 1) {
+            TriangularRoute memory route = abi.decode(routeData, (TriangularRoute));
+            uint256 amountB = _swap(route.tokenA, route.tokenB, amount, route.dex1, route.feeOrSpacing1);
+            uint256 amountC = _swap(route.tokenB, route.tokenC, amountB, route.dex2, route.feeOrSpacing2);
+            _swap(route.tokenC, route.tokenA, amountC, route.dex3, route.feeOrSpacing3);
 
             uint256 currentBalance = IERC20(asset).balanceOf(address(this));
             if (currentBalance < amountOwed + route.minProfit) {

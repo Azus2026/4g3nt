@@ -24,9 +24,14 @@ export class SharedPoolStateEngine {
   private lastRefreshTime: number = 0;
 
   /**
-   * Refresca en paralelo todas las pools de todas las cadenas mediante Multicall3
+   * Refresca en paralelo pools de las cadenas principales mediante Multicall3
+   * Incorpora un cooldown de 10 segundos para evitar agotar créditos de RPC
    */
-  async refreshAllChains(): Promise<void> {
+  async refreshAllChains(force: boolean = false): Promise<void> {
+    const now = Date.now();
+    if (!force && (now - this.lastRefreshTime < 10000)) {
+      return; // Servir desde memoria RAM
+    }
     if (this.isRefreshing) return;
     this.isRefreshing = true;
 

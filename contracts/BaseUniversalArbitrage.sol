@@ -61,11 +61,29 @@ interface IPool {
     ) external;
 }
 
+interface IBalancerVault {
+    function flashLoan(
+        address recipient,
+        IERC20[] memory tokens,
+        uint256[] memory amounts,
+        bytes memory userData
+    ) external;
+}
+
+interface IFlashLoanRecipient {
+    function receiveFlashLoan(
+        IERC20[] memory tokens,
+        uint256[] memory amounts,
+        uint256[] memory feeAmounts,
+        bytes memory userData
+    ) external;
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  Contrato Universal Multi-DEX: 2-Leg Espacial + 3-Leg Triangular
 // ═══════════════════════════════════════════════════════════════
 
-contract BaseUniversalArbitrage {
+contract BaseUniversalArbitrage is IFlashLoanRecipient {
     using SafeERC20 for IERC20;
 
     address public immutable owner;
@@ -77,6 +95,7 @@ contract BaseUniversalArbitrage {
     IUniswapV3Router public constant PANCAKE_V3_ROUTER = IUniswapV3Router(0x1b81D678ffb9C0263b24A97847620C99d213eB14);
     IUniswapV3Router public constant SUSHISWAP_V3_ROUTER = IUniswapV3Router(0xFB7eF66a7e61224DD6FcD0D7d9C3be5C8B049b9f);
     IPool public constant AAVE_POOL = IPool(0xA238Dd80C259a72e81d7e4664a9801593F98d1c5);
+    address public constant BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
 
     // ── Identificadores de DEX ──
     uint8 public constant DEX_UNIV3 = 0;
@@ -189,6 +208,67 @@ contract BaseUniversalArbitrage {
     function executeFlashLoanTriangular(TriangularRoute calldata route, uint256 loanAmount) external onlyOwner nonReentrant {
         bytes memory params = abi.encode(uint8(3), abi.encode(route));
         AAVE_POOL.flashLoanSimple(address(this), route.tokenA, loanAmount, params, 0);
+    }
+
+    // ── Flash Loans con Balancer V2 (0% Fee) ──
+    function executeBalancerFlashLoanSpatial(SpatialRoute calldata route, uint256 loanAmount) external onlyOwner nonReentrant {
+        IERC20[] memory tokens = new IERC20[](1);
+        tokens[0] = IERC20(route.tokenIn);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = loanAmount;
+        bytes memory userData = abi.encode(uint8(2), abi.encode(route));
+        IBalancerVault(BALANCER_VAULT).flashLoan(address(this), tokens, amounts, userData);
+    }
+
+    function executeBalancerFlashLoanTriangular(TriangularRoute calldata route, uint256 loanAmount) external onlyOwner nonReentrant {
+        IERC20[] memory tokens = new IERC20[](1);
+        tokens[0] = IERC20(route.tokenA);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = loanAmount;
+        bytes memory userData = abi.encode(uint8(3), abi.encode(route));
+        IBalancerVault(BALANCER_VAULT).flashLoan(address(this), tokens, amounts, userData);
+    }
+
+    function receiveFlashLoan(
+        IERC20[] memory tokens,
+        uint256[] memory amounts,
+        uint256[] memory feeAmounts,
+        bytes memory userData
+    ) external override {
+        require(msg.sender == BALANCER_VAULT, "Caller not Balancer Vault");
+
+        (uint8 mode, bytes memory routeData) = abi.decode(userData, (uint8, bytes));
+        address asset = address(tokens[0]);
+        uint256 amount = amounts[0];
+        uint256 amountOwed = amount + feeAmounts[0]; // Balancer fee is 0%
+        uint256 finalOut;
+        uint256 minProfit;
+
+        if (mode == 2) {
+            SpatialRoute memory route = abi.decode(routeData, (SpatialRoute));
+            minProfit = route.minProfit;
+            uint256 mid = _swap(route.dexBuy, asset, route.tokenIntermediate, amount, route.feeOrSpacingBuy);
+            finalOut = _swap(route.dexSell, route.tokenIntermediate, asset, mid, route.feeOrSpacingSell);
+        } else {
+            TriangularRoute memory route = abi.decode(routeData, (TriangularRoute));
+            minProfit = route.minProfit;
+            uint256 out1 = _swap(route.dex1, asset, route.tokenB, amount, route.feeOrSpacing1);
+            uint256 out2 = _swap(route.dex2, route.tokenB, route.tokenC, out1, route.feeOrSpacing2);
+            finalOut = _swap(route.dex3, route.tokenC, asset, out2, route.feeOrSpacing3);
+        }
+
+        uint256 currentBalance = IERC20(asset).balanceOf(address(this));
+        if (currentBalance < amountOwed + minProfit) {
+            revert NotProfitable(currentBalance, amountOwed + minProfit);
+        }
+
+        IERC20(asset).safeTransfer(BALANCER_VAULT, amountOwed);
+        uint256 profit = currentBalance - amountOwed;
+        if (profit > 0) {
+            IERC20(asset).safeTransfer(owner, profit);
+        }
+
+        emit FlashLoanExecuted(asset, amount, feeAmounts[0], profit);
     }
 
     function executeOperation(

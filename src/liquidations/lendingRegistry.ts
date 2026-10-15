@@ -17,6 +17,13 @@ export const LENDING_POOLS: LendingPoolConfig[] = [
     liquidationBonusPercent: 8.0,
     oracleAddress: '0x21058C8c75e34e36949420bcF38d5494999939a3'
   },
+  {
+    protocol: 'MORPHO_BLUE',
+    chainId: 8453,
+    poolAddress: '0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb',
+    liquidationBonusPercent: 8.5,
+    oracleAddress: '0x21058C8c75e34e36949420bcF38d5494999939a3'
+  },
 
   // 🔷 Arbitrum Aave V3 & Radiant
   {

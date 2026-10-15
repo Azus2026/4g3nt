@@ -71,7 +71,7 @@ export const SUPPORTED_CHAINS: Record<number, ChainConfig> = {
     premiumRpcUrl: 'https://base-rpc.publicnode.com',
     wssUrl: 'wss://base-rpc.publicnode.com',
     blockExplorer: 'https://basescan.org',
-    flashLoanProviders: ['aavev3'],
+    flashLoanProviders: ['balancerv2', 'aavev3'],
   },
   56: {
     chainId: 56,

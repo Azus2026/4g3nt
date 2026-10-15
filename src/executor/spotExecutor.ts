@@ -3,6 +3,7 @@ import { ENV } from '../config/env';
 import { logger } from '../utils/logger';
 import { SERVER_STATS, addScanLog, addSpotOpportunity, addFlashOpportunity } from '../server';
 import { savePersistedStats } from '../utils/statsStore';
+import { SweetSpotOptimizer } from '../math/sweetSpotOptimizer';
 
 // Contrato Universal de Arbitraje Desplegado en Base (ChainID 8453)
 export const ARBITRAGE_CONTRACT_BASE = ENV.arbitrageContractBase || '0xdA593D75439364a864a92416430FFA1268724059';
@@ -210,15 +211,28 @@ export class SpotExecutor {
 
       const pathDesc = `${DEX_NAMES[buyDex]} ➔ ${DEX_NAMES[sellDex]}`;
 
-      // 1. Probar Tiers de Flash Loans ($1,250 a $7,500 USD)
+      // 1. Probar Tiers de Flash Loans con Balancer V2 (0% Fee) y Aave V3 como fallback
       let profitableFlashAmount: bigint | null = null;
+      let isBalancer = false;
       for (const fAmount of FLASH_AMOUNT_TIERS) {
         try {
-          await this.arbitrageContract.executeFlashLoanSpatial.staticCall(routeStruct, fAmount);
+          await this.arbitrageContract.executeBalancerFlashLoanSpatial.staticCall(routeStruct, fAmount);
           profitableFlashAmount = fAmount;
+          isBalancer = true;
           break;
         } catch {
           // Revert normal cuando no hay spread
+        }
+      }
+
+      if (!profitableFlashAmount) {
+        for (const fAmount of FLASH_AMOUNT_TIERS) {
+          try {
+            await this.arbitrageContract.executeFlashLoanSpatial.staticCall(routeStruct, fAmount);
+            profitableFlashAmount = fAmount;
+            isBalancer = false;
+            break;
+          } catch {}
         }
       }
 
@@ -253,9 +267,12 @@ export class SpotExecutor {
       const formattedSpread = parseFloat(dynamicSpread.toFixed(3));
       const tradeCapUSD = profitableSpotAmount ? (parseFloat(ethers.formatEther(profitableSpotAmount)) * 2500) : 35.0;
       const grossUSD = parseFloat(((tradeCapUSD * formattedSpread) / 100).toFixed(4));
-      const gasUSD = 0.0003;
+      
+      // Cálculo cuantitativo real de Gas: L2 Execution + L1 Calldata Fee en Base
+      const gasEst = SweetSpotOptimizer.calculateTotalGasCostUSD(8453, 200_000n, 0.05, 2500, 384);
+      const gasUSD = gasEst.totalGasUSD;
       const netUSD = (profitableSpotAmount || profitableFlashAmount)
-        ? parseFloat((grossUSD - (tradeCapUSD * 0.0010) - gasUSD).toFixed(4))
+        ? parseFloat((grossUSD - (tradeCapUSD * (isBalancer ? 0.0003 : 0.0010)) - gasUSD).toFixed(4))
         : 0;
 
       // Registrar Telemetría en vivo con Spread Dinámico Real
@@ -280,12 +297,13 @@ export class SpotExecutor {
       // 🚀 DISPARO ON-CHAIN SI LA SIMULACIÓN ARROJA BENEFICIO NETO
       if (profitableFlashAmount) {
         this.isExecuting = true;
-        logger.success(`🔥 [FLASH LOAN ESPACIAL DETECTADO] Oportunidad en ${pairName} | ${pathDesc} con ${ethers.formatEther(profitableFlashAmount)} WETH!`);
-        addScanLog(`🚀 [DISPARO ON-CHAIN] Flash Loan Espacial ${pairName} (${pathDesc}) con ${ethers.formatEther(profitableFlashAmount)} WETH...`);
+        const providerName = isBalancer ? 'Balancer V2 (0% Fee)' : 'Aave V3';
+        logger.success(`🔥 [FLASH LOAN ${providerName} DETECTADO] Oportunidad en ${pairName} | ${pathDesc} con ${ethers.formatEther(profitableFlashAmount)} WETH!`);
+        addScanLog(`🚀 [DISPARO ON-CHAIN] Flash Loan ${providerName} ${pairName} (${pathDesc}) con ${ethers.formatEther(profitableFlashAmount)} WETH...`);
 
-        const tx = await this.arbitrageContract.executeFlashLoanSpatial(routeStruct, profitableFlashAmount, {
-          gasLimit: 600000,
-        });
+        const tx = isBalancer
+          ? await this.arbitrageContract.executeBalancerFlashLoanSpatial(routeStruct, profitableFlashAmount, { gasLimit: 500000 })
+          : await this.arbitrageContract.executeFlashLoanSpatial(routeStruct, profitableFlashAmount, { gasLimit: 500000 });
 
         logger.info(`⚡ Tx Enviada: https://basescan.org/tx/${tx.hash}`);
         const receipt = await tx.wait(1);
@@ -397,15 +415,28 @@ export class SpotExecutor {
 
       const pathDesc = `${DEX_NAMES[dex1]} ➔ ${DEX_NAMES[dex2]} ➔ ${DEX_NAMES[dex3]}`;
 
-      // 1. Simulación Flash Loans Multi-Tier (1.0 a 50.0 WETH)
+      // 1. Simulación Flash Loans Multi-Tier con Balancer V2 (0% Fee) y Aave V3 fallback
       let profitableFlashAmount: bigint | null = null;
+      let isBalancer = false;
       for (const fAmount of FLASH_AMOUNT_TIERS) {
         try {
-          await this.arbitrageContract.executeFlashLoanTriangular.staticCall(routeStruct, fAmount);
+          await this.arbitrageContract.executeBalancerFlashLoanTriangular.staticCall(routeStruct, fAmount);
           profitableFlashAmount = fAmount;
+          isBalancer = true;
           break;
         } catch {
           // Revert normal
+        }
+      }
+
+      if (!profitableFlashAmount) {
+        for (const fAmount of FLASH_AMOUNT_TIERS) {
+          try {
+            await this.arbitrageContract.executeFlashLoanTriangular.staticCall(routeStruct, fAmount);
+            profitableFlashAmount = fAmount;
+            isBalancer = false;
+            break;
+          } catch {}
         }
       }
 
@@ -440,9 +471,11 @@ export class SpotExecutor {
       const formattedTriSpread = parseFloat(dynamicTriSpread.toFixed(3));
       const triCapUSD = profitableSpotAmount ? (parseFloat(ethers.formatEther(profitableSpotAmount)) * 2500) : 35.0;
       const triGrossUSD = parseFloat(((triCapUSD * formattedTriSpread) / 100).toFixed(4));
-      const triGasUSD = 0.0004;
+      // Cálculo cuantitativo real de Gas en 3-Leg (L2 Execution + L1 Calldata en Base)
+      const triGasEst = SweetSpotOptimizer.calculateTotalGasCostUSD(8453, 260_000n, 0.05, 2500, 512);
+      const triGasUSD = triGasEst.totalGasUSD;
       const triNetUSD = (profitableFlashAmount || profitableSpotAmount)
-        ? parseFloat((triGrossUSD - (triCapUSD * 0.0020) - triGasUSD).toFixed(4))
+        ? parseFloat((triGrossUSD - (triCapUSD * (isBalancer ? 0.0005 : 0.0020)) - triGasUSD).toFixed(4))
         : 0;
 
       addSpotOpportunity({
@@ -465,12 +498,13 @@ export class SpotExecutor {
 
       if (profitableFlashAmount) {
         this.isExecuting = true;
-        logger.success(`🔥 [FLASH LOAN TRIANGULAR DETECTADO] Oportunidad en ${pairName} (${pathDesc}) con ${ethers.formatEther(profitableFlashAmount)} WETH!`);
-        addScanLog(`🚀 [DISPARO ON-CHAIN] Flash Loan Triangular ${pairName} (${pathDesc}) con ${ethers.formatEther(profitableFlashAmount)} WETH...`);
+        const providerName = isBalancer ? 'Balancer V2 (0% Fee)' : 'Aave V3';
+        logger.success(`🔥 [FLASH LOAN ${providerName} TRIANGULAR DETECTADO] Oportunidad en ${pairName} (${pathDesc}) con ${ethers.formatEther(profitableFlashAmount)} WETH!`);
+        addScanLog(`🚀 [DISPARO ON-CHAIN] Flash Loan ${providerName} Triangular ${pairName} (${pathDesc}) con ${ethers.formatEther(profitableFlashAmount)} WETH...`);
 
-        const tx = await this.arbitrageContract.executeFlashLoanTriangular(routeStruct, profitableFlashAmount, {
-          gasLimit: 750000,
-        });
+        const tx = isBalancer
+          ? await this.arbitrageContract.executeBalancerFlashLoanTriangular(routeStruct, profitableFlashAmount, { gasLimit: 750000 })
+          : await this.arbitrageContract.executeFlashLoanTriangular(routeStruct, profitableFlashAmount, { gasLimit: 750000 });
 
         logger.info(`⚡ Tx Enviada: https://basescan.org/tx/${tx.hash}`);
         const receipt = await tx.wait(1);

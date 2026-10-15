@@ -15,4 +15,6 @@ export const ENV = {
   port: parseInt(process.env.PORT || '3000', 10),
   arbitrageContractBase: process.env.ARBITRAGE_CONTRACT_BASE || '0xdA593D75439364a864a92416430FFA1268724059',
   arbitrageContractArbitrum: process.env.ARBITRAGE_CONTRACT_ARBITRUM || '0xfD164F1b738FE3594C33A569Aa4F21D1855A47E2',
+  arbitrumWssUrl: process.env.ARBITRUM_WSS_URL || 'wss://arb1.arbitrum.io/feed',
+  baseWssUrl: process.env.BASE_WSS_URL || 'wss://base-rpc.publicnode.com',
 };

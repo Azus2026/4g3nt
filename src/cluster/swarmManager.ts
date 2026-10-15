@@ -50,6 +50,22 @@ export class SwarmManager {
     }
   }
 
+  /**
+   * Dispara un escaneo reactivo inmediato para una cadena específica (Arbitrum Sequencer Feed o Base Flashblocks)
+   */
+  async triggerChainScan(chainId: number): Promise<void> {
+    const chainPairs = MULTI_CHAIN_ARBITRAGE_PAIRS.filter(p => p.chainId === chainId);
+    if (chainPairs.length === 0) return;
+
+    const topPairs = chainPairs.slice(0, 5);
+    await Promise.all(
+      topPairs.map(async (pair) => {
+        const worker = this.workers.get(pair.assignedAgentId);
+        if (worker) await worker.runScanCycle().catch(() => {});
+      })
+    );
+  }
+
   async startSwarmLoop() {
     logger.success(`🔥 Mega-Cluster de ${this.workers.size} Agentes activado. Pipeline de Memoria Compartida Multicall3 activo.`);
 

@@ -327,6 +327,20 @@ export class SpotExecutor {
 
         const gasLimit = (gasEstimated * 115n) / 100n;
         logger.success(`🔥 [FLASH LOAN ${providerName}] Oportunidad en ${pairName} | ${pathDesc} (${ethers.formatEther(profitableFlashAmount)} WETH)!`);
+
+        if (ENV.dryRun) {
+          logger.info(`🧪 [DRY RUN VALIDADO] Flash Loan ${providerName} en ${pairName} | Spread: ${formattedSpread}% | Net: +$${netUSD} USD | Gas estimado: $${gasUSD}. Omitiendo tx real.`);
+          addScanLog(`🧪 [DRY RUN] Oportunidad validada en ${pairName} (Net: +$${netUSD} USD).`);
+          this.consecutiveErrors = 0;
+          SERVER_STATS.flashLoans.onChainExecutedCount++;
+          SERVER_STATS.flashLoans.detectedPnLUSD += netUSD;
+          SERVER_STATS.spotBase.executedCount++;
+          SERVER_STATS.spotBase.realizedPnLUSD += netUSD;
+          savePersistedStats();
+          this.isExecuting = false;
+          return true;
+        }
+
         addScanLog(`🚀 [DISPARO ON-CHAIN] Flash Loan ${providerName} ${pairName} (${pathDesc})...`);
 
         const tx = isBalancer
@@ -365,6 +379,17 @@ export class SpotExecutor {
 
         const gasLimit = (gasEstimated * 115n) / 100n;
         logger.success(`🔥 [SPOT ESPACIAL DETECTADO] Oportunidad en ${pairName} | ${pathDesc} (${ethers.formatEther(profitableSpotAmount)} WETH)!`);
+
+        if (ENV.dryRun) {
+          logger.info(`🧪 [DRY RUN VALIDADO] Spot Espacial en ${pairName} | Net: +$${netUSD} USD. Omitiendo tx real.`);
+          addScanLog(`🧪 [DRY RUN] Spot validado en ${pairName} (Net: +$${netUSD} USD).`);
+          this.consecutiveErrors = 0;
+          SERVER_STATS.spotBase.executedCount++;
+          SERVER_STATS.spotBase.realizedPnLUSD += netUSD;
+          savePersistedStats();
+          this.isExecuting = false;
+          return true;
+        }
 
         const tx = await this.arbitrageContract.executeSpotSpatial(routeStruct, profitableSpotAmount, { gasLimit });
         logger.info(`⚡ Tx Enviada: https://basescan.org/tx/${tx.hash}`);
@@ -534,6 +559,19 @@ export class SpotExecutor {
         const gasLimit = (gasEstimated * 115n) / 100n;
         logger.success(`🔥 [FLASH LOAN ${providerName} TRIANGULAR] ${pairName} (${ethers.formatEther(profitableFlashAmount)} WETH)!`);
 
+        if (ENV.dryRun) {
+          logger.info(`🧪 [DRY RUN VALIDADO] Flash Loan Triangular ${providerName} en ${pairName} | Net: +$${triNetUSD} USD. Omitiendo tx real.`);
+          addScanLog(`🧪 [DRY RUN] Flash Triangular validado en ${pairName} (Net: +$${triNetUSD} USD).`);
+          this.consecutiveErrors = 0;
+          SERVER_STATS.flashLoans.onChainExecutedCount++;
+          SERVER_STATS.flashLoans.detectedPnLUSD += triNetUSD;
+          SERVER_STATS.spotBase.executedCount++;
+          SERVER_STATS.spotBase.realizedPnLUSD += triNetUSD;
+          savePersistedStats();
+          this.isExecuting = false;
+          return true;
+        }
+
         const tx = isBalancer
           ? await this.arbitrageContract.executeBalancerFlashLoanTriangular(routeStruct, profitableFlashAmount, { gasLimit })
           : await this.arbitrageContract.executeFlashLoanTriangular(routeStruct, profitableFlashAmount, { gasLimit });
@@ -567,6 +605,18 @@ export class SpotExecutor {
         }
 
         const gasLimit = (gasEstimated * 115n) / 100n;
+
+        if (ENV.dryRun) {
+          logger.info(`🧪 [DRY RUN VALIDADO] Spot Triangular en ${pairName} | Net: +$${triNetUSD} USD. Omitiendo tx real.`);
+          addScanLog(`🧪 [DRY RUN] Spot Triangular validado en ${pairName} (Net: +$${triNetUSD} USD).`);
+          this.consecutiveErrors = 0;
+          SERVER_STATS.spotBase.executedCount++;
+          SERVER_STATS.spotBase.realizedPnLUSD += triNetUSD;
+          savePersistedStats();
+          this.isExecuting = false;
+          return true;
+        }
+
         const tx = await this.arbitrageContract.executeSpotTriangular(routeStruct, profitableSpotAmount, { gasLimit });
         const receipt = await tx.wait(1);
 

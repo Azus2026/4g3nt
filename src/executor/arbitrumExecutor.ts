@@ -285,6 +285,18 @@ export class ArbitrumExecutor {
 
         const gasLimit = (gasEstimated * 115n) / 100n;
         logger.success(`🔥 [FLASH LOAN ${providerName} ARBITRUM] ${pairName} (${ethers.formatEther(profitableFlashAmount)} WETH)!`);
+
+        if (ENV.dryRun) {
+          logger.info(`🧪 [DRY RUN VALIDADO ARBITRUM] Flash Loan ${providerName} en ${pairName} | Spread: ${formattedSpread}% | Net: +$${netUSD} USD. Omitiendo tx real.`);
+          addScanLog(`🧪 [DRY RUN ARBITRUM] Oportunidad validada en ${pairName} (Net: +$${netUSD} USD).`, 'FLASH_LOAN');
+          this.consecutiveErrors = 0;
+          SERVER_STATS.flashLoans.onChainExecutedCount++;
+          SERVER_STATS.flashLoans.detectedPnLUSD += netUSD;
+          savePersistedStats();
+          this.isExecuting = false;
+          return true;
+        }
+
         addScanLog(`🚀 [DISPARO ON-CHAIN ARBITRUM] ${pairName} (${pathDesc})...`, 'FLASH_LOAN');
 
         const tx = isBalancer
@@ -433,8 +445,16 @@ export class ArbitrumExecutor {
         }
 
         const gasLimit = (gasEstimated * 115n) / 100n;
-        logger.success(`🔥 [TRIANGULAR ${providerName} ARBITRUM] ${pairName} (${ethers.formatEther(profitableFlashAmount)} WETH)!`);
-        addScanLog(`🚀 [DISPARO TRIANGULAR ${providerName} ARBITRUM] ${pairName}...`, 'FLASH_LOAN');
+        if (ENV.dryRun) {
+          logger.info(`🧪 [DRY RUN VALIDADO ARBITRUM] Flash Loan Triangular ${providerName} en ${pairName} | Spread: ${formattedTriSpread}% | Net: +$${triNetUSD} USD. Omitiendo tx real.`);
+          addScanLog(`🧪 [DRY RUN ARBITRUM] Triangular validado en ${pairName} (Net: +$${triNetUSD} USD).`, 'FLASH_LOAN');
+          this.consecutiveErrors = 0;
+          SERVER_STATS.flashLoans.onChainExecutedCount++;
+          SERVER_STATS.flashLoans.detectedPnLUSD += triNetUSD;
+          savePersistedStats();
+          this.isExecuting = false;
+          return true;
+        }
 
         const tx = isBalancer
           ? await this.arbitrageContract.executeBalancerFlashLoanTriangular(routeStruct, profitableFlashAmount, { gasLimit })

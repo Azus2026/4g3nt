@@ -8,25 +8,37 @@ import { logger } from './utils/logger';
 import { telegramNotifier } from './notifications/telegramNotifier';
 import { loadPersistedStats } from './utils/statsStore';
 import { Permit2ApprovalManager } from './executor/permit2ApprovalManager';
+import { SweetSpotOptimizer } from './math/sweetSpotOptimizer';
+import { ArbitrumSequencerFeedListener, BaseFlashblockFeedListener } from './mempool/mempoolListener';
 
 async function main() {
   // Cargar estadísticas históricas desde disco
   loadPersistedStats();
 
   logger.divider();
-  logger.info('🚀 INICIANDO CLUSTER DE 10 AGENTES SWARM DE ARBITRAJE FLASH LOAN V2 (OPTIMIZADO)');
+  logger.info('🚀 INICIANDO CLUSTER DE AGENTES DE ARBITRAJE FLASH LOAN V2 (OPTIMIZADO)');
   logger.info(`   Agentes Concurrentes: ${SWARM_AGENTS.length} Agentes Especializados`);
   logger.info(`   Pares de Liquidez Totales: ${MULTI_CHAIN_ARBITRAGE_PAIRS.length} Pares Multi-Cadena`);
   logger.info(`   Modo DRY_RUN: ${ENV.dryRun ? 'ACTIVADO (Simulación sin riesgo)' : 'DESACTIVADO (MODO LIVE MAINNET REAL)'}`);
   logger.info(`   Ganancia Mínima Objetivo: $${ENV.minProfitUSD.toFixed(2)} USD`);
-  logger.info(`   Optimizaciones MEV: Sweet Spot Loan Search | Balancer 0% Fee | WSS Sub-Segundo | Flashbots Relays`);
+  logger.info(`   Optimizaciones MEV: Sweet Spot Loan Search | Balancer 0% Fee | Arbitrum Sequencer Feed | Base Flashblocks`);
   logger.divider();
 
   // 1. Inicializar Gestor de RPCs y cargar Chainlist.org
   const rpcManager = new RPCManager();
   await rpcManager.loadChainlistRPCs();
 
-  // 2. Garantizar autorizaciones de Uniswap Permit2 y preparar Spot Executor en Base
+  // 2. Monitoreo en Vivo de L1 Data Fee (EIP-4844 Blobs)
+  const baseProvider = rpcManager.getProvider(8453);
+  const arbProvider = rpcManager.getProvider(42161);
+  await SweetSpotOptimizer.updateL1GasFees(baseProvider, arbProvider);
+  logger.info(`⛽ [L1 DATA FEE MONITOR] Parámetros EIP-4844 actualizados (Base L1: ${SweetSpotOptimizer.liveL1BaseFeeBase} wei, Arb L1: ${SweetSpotOptimizer.liveL1BaseFeeArb} wei)`);
+
+  setInterval(() => {
+    SweetSpotOptimizer.updateL1GasFees(baseProvider, arbProvider).catch(() => {});
+  }, 30000);
+
+  // 3. Garantizar autorizaciones de Uniswap Permit2 y preparar Ejecutores
   const permit2Manager = new Permit2ApprovalManager(rpcManager);
   await permit2Manager.ensureAllPermit2Approvals().catch((e) => {
     logger.warn(`Fallo no-bloqueante en Permit2 approvals: ${e.message}`);
@@ -47,7 +59,7 @@ async function main() {
     logger.warn(`Fallo no-bloqueante en Low-Fee Executor: ${e.message}`);
   });
 
-  // Benchmark preliminar para TODAS las cadenas (Ethereum, Arbitrum, Optimism, Polygon, Base, BSC, Avalanche)
+  // Benchmark preliminar para TODAS las cadenas
   logger.info('Iniciando benchmark de latencia RPC para todas las cadenas soportadas...');
   for (const chainIdStr of Object.keys(SUPPORTED_CHAINS)) {
     const chainId = parseInt(chainIdStr, 10);
@@ -57,17 +69,36 @@ async function main() {
     });
   }
 
-  // 2. Inicializar Swarm Cluster de 10 Agentes
+  // 4. Inicializar Swarm Cluster de Agentes
   const swarmManager = new SwarmManager(rpcManager);
   setSwarmManager(swarmManager);
 
-  // 3. Iniciar Servidor de API HTTP
+  // 5. Conexión de Infraestructura MEV de Alta Velocidad
+  // Arbitrum Nitro Sequencer Feed (sub-10ms)
+  const arbSequencerFeed = new ArbitrumSequencerFeedListener(
+    ENV.arbitrumWssUrl || 'wss://arb1.arbitrum.io/feed',
+    (batchCount) => {
+      swarmManager.triggerChainScan(42161).catch(() => {});
+    }
+  );
+  arbSequencerFeed.start();
+
+  // Base Flashblocks / Bloques Rápidos
+  const baseFlashblockFeed = new BaseFlashblockFeedListener(
+    ENV.baseWssUrl || 'wss://base-rpc.publicnode.com',
+    (blockNum) => {
+      swarmManager.triggerChainScan(8453).catch(() => {});
+    }
+  );
+  baseFlashblockFeed.start();
+
+  // 6. Iniciar Servidor de API HTTP
   startServer();
 
-  // 4. Notificar a Telegram
+  // 7. Notificar a Telegram
   await telegramNotifier.notifyStartup(MULTI_CHAIN_ARBITRAGE_PAIRS.length, SWARM_AGENTS.length).catch(() => {});
 
-  // 5. Arrancar ciclo del Cluster
+  // 8. Arrancar ciclo del Cluster
   await swarmManager.startSwarmLoop();
 }
 

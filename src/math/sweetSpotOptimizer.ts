@@ -17,11 +17,72 @@ export class SweetSpotOptimizer {
   private static PHI = (1 + Math.sqrt(5)) / 2; // Golden Ratio (~1.6180339887)
   private static RES_PHI = 2 - SweetSpotOptimizer.PHI; // (~0.3819660113)
 
+  // Live L1 Fee Cache (EIP-4844 Blobs & BaseFee)
+  public static liveL1BaseFeeBase: bigint = 62000000n; // ~0.062 gwei in wei
+  public static liveBlobBaseFeeBase: bigint = 3800000n; // ~0.0038 gwei in wei
+  public static liveBaseFeeScalarBase: number = 2269;
+  public static liveBlobBaseFeeScalarBase: number = 1055762;
+  public static liveL1BaseFeeArb: bigint = 1200000n; // ~0.0012 gwei in wei
+  public static lastL1UpdateTimestamp: number = 0;
+  private static isUpdatingL1Fees: boolean = false;
+
   /**
-   * Cálculo de Gas Real en L2: Suma de L2 Execution Fee + L1 Calldata/Blob Fee (OP Stack / Base)
-   * En Base, el GasPriceOracle (0x420000000000000000000000000000000000000F) cobra getL1Fee(bytes).
-   * Para transacciones típicas de arbitraje (calldata ~256 a 512 bytes):
-   * L1 Data Fee ronda entre $0.002 y $0.02 según el costo del blob en L1.
+   * Actualiza los parámetros en tiempo real de L1 Data Fee desde los oráculos oficiales on-chain:
+   * - Base: GasPriceOracle en 0x420000000000000000000000000000000000000F
+   * - Arbitrum: ArbGasInfo precompile en 0x000000000000000000000000000000000000006C
+   */
+  public static async updateL1GasFees(providerBase?: any, providerArb?: any): Promise<void> {
+    if (this.isUpdatingL1Fees) return;
+    this.isUpdatingL1Fees = true;
+
+    try {
+      // 1. Base GasPriceOracle
+      if (providerBase) {
+        try {
+          const oracleAbi = [
+            'function l1BaseFee() view returns (uint256)',
+            'function blobBaseFee() view returns (uint256)',
+            'function baseFeeScalar() view returns (uint32)',
+            'function blobBaseFeeScalar() view returns (uint32)'
+          ];
+          const oracle = new (providerBase.constructor as any) ? (providerBase as any) : null;
+          // Si providerBase es un JsonRpcProvider o similar
+          const ethersModule = await import('ethers');
+          const contract = new ethersModule.Contract('0x420000000000000000000000000000000000000F', oracleAbi, providerBase);
+          const [l1BaseFee, blobBaseFee, baseFeeScalar, blobBaseFeeScalar] = await Promise.all([
+            contract.l1BaseFee().catch(() => null),
+            contract.blobBaseFee().catch(() => null),
+            contract.baseFeeScalar().catch(() => null),
+            contract.blobBaseFeeScalar().catch(() => null)
+          ]);
+
+          if (l1BaseFee != null) this.liveL1BaseFeeBase = BigInt(l1BaseFee);
+          if (blobBaseFee != null) this.liveBlobBaseFeeBase = BigInt(blobBaseFee);
+          if (baseFeeScalar != null) this.liveBaseFeeScalarBase = Number(baseFeeScalar);
+          if (blobBaseFeeScalar != null) this.liveBlobBaseFeeScalarBase = Number(blobBaseFeeScalar);
+        } catch {}
+      }
+
+      // 2. Arbitrum ArbGasInfo
+      if (providerArb) {
+        try {
+          const arbAbi = ['function getL1BaseFeeEstimate() view returns (uint256)'];
+          const ethersModule = await import('ethers');
+          const arbContract = new ethersModule.Contract('0x000000000000000000000000000000000000006C', arbAbi, providerArb);
+          const arbL1Fee = await arbContract.getL1BaseFeeEstimate().catch(() => null);
+          if (arbL1Fee != null) this.liveL1BaseFeeArb = BigInt(arbL1Fee);
+        } catch {}
+      }
+
+      this.lastL1UpdateTimestamp = Date.now();
+    } catch {} finally {
+      this.isUpdatingL1Fees = false;
+    }
+  }
+
+  /**
+   * Cálculo de Gas Real en L2: Suma de L2 Execution Fee + L1 Calldata/Blob Fee (OP Stack / Arbitrum Nitro)
+   * Integra la fórmula EIP-4844 Fjord de Base y ArbGasInfo en Arbitrum.
    */
   public static calculateTotalGasCostUSD(
     chainId: number,
@@ -29,27 +90,37 @@ export class SweetSpotOptimizer {
     l2GasPriceGwei: number = 0.05,
     ethPriceUSD: number = 2500,
     calldataSizeBytes: number = 384,
-    l1BaseFeeGwei: number = 1.0
+    l1BaseFeeGweiOverride?: number
   ): { totalGasUSD: number; l2GasUSD: number; l1DataFeeUSD: number } {
     // 1. Costo de ejecución L2
     const l2GasEth = (Number(gasUsedL2) * l2GasPriceGwei) / 1e9;
     const l2GasUSD = l2GasEth * ethPriceUSD;
 
-    // 2. Costo L1 Data Fee (EIP-4844 Blob calldata fee en Base y Arbitrum)
+    // 2. Costo L1 Data Fee Dinámico (EIP-4844 Blobs + Calldata)
     let l1DataFeeUSD = 0;
+
     if (chainId === 8453) {
-      // Base (OP Stack con Ecotone/Fjord scalar)
-      // Estimación cuantitativa precisa de L1 calldata fee
-      const estimatedL1Gas = calldataSizeBytes * 16;
-      const l1FeeEth = (estimatedL1Gas * l1BaseFeeGwei * 0.7) / 1e9;
-      l1DataFeeUSD = Math.max(l1FeeEth * ethPriceUSD, 0.0015);
+      // Base (OP Stack Fjord / Ecotone scalar con Blobs)
+      // Fórmula oficial: l1Fee = (16 * calldataSize * l1BaseFee * baseFeeScalar + calldataSize * blobBaseFee * blobBaseFeeScalar) / (1e6 * 1e9 * 1e9)
+      const calldataBig = BigInt(calldataSizeBytes);
+      const l1BaseFee = l1BaseFeeGweiOverride != null ? BigInt(Math.round(l1BaseFeeGweiOverride * 1e9)) : this.liveL1BaseFeeBase;
+      const blobBaseFee = this.liveBlobBaseFeeBase;
+
+      const basePortion = 16n * calldataBig * l1BaseFee * BigInt(this.liveBaseFeeScalarBase);
+      const blobPortion = calldataBig * blobBaseFee * BigInt(this.liveBlobBaseFeeScalarBase);
+      const totalL1Wei = (basePortion + blobPortion) / 1000000n; // scalar divisor es 1e6
+
+      const l1FeeEth = Number(totalL1Wei) / 1e18;
+      l1DataFeeUSD = Math.max(l1FeeEth * ethPriceUSD, 0.0005);
     } else if (chainId === 42161) {
-      // Arbitrum One L1 poster fee
-      const arbL1FeeEth = (calldataSizeBytes * 12 * l1BaseFeeGwei) / 1e9;
-      l1DataFeeUSD = Math.max(arbL1FeeEth * ethPriceUSD, 0.001);
+      // Arbitrum One Nitro L1 calldata poster fee
+      const l1BaseFeeWei = l1BaseFeeGweiOverride != null ? BigInt(Math.round(l1BaseFeeGweiOverride * 1e9)) : this.liveL1BaseFeeArb;
+      const arbL1FeeWei = BigInt(calldataSizeBytes) * 16n * l1BaseFeeWei;
+      const l1FeeEth = Number(arbL1FeeWei) / 1e18;
+      l1DataFeeUSD = Math.max(l1FeeEth * ethPriceUSD, 0.0005);
     }
 
-    const totalGasUSD = l2GasUSD + l1DataFeeUSD;
+    const totalGasUSD = parseFloat((l2GasUSD + l1DataFeeUSD).toFixed(5));
     return { totalGasUSD, l2GasUSD, l1DataFeeUSD };
   }
 

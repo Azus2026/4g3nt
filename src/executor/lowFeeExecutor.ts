@@ -334,6 +334,18 @@ export class LowFeeExecutor {
 
         const gasLimit = (gasEstimated * 115n) / 100n;
         logger.success(`🔥 [LOW-FEE FLASH DISPARADO] ${pairName} vía ${providerName}!`);
+
+        if (ENV.dryRun) {
+          logger.info(`🧪 [DRY RUN VALIDADO LOW-FEE] Flash Loan ${providerName} en ${pairName} | Spread: ${formattedSpread}% | Net: +$${netUSD} USD. Omitiendo tx real.`);
+          addScanLog(`🧪 [DRY RUN LOW-FEE] Oportunidad validada en ${pairName} (Net: +$${netUSD} USD).`, 'LOW_FEE');
+          this.consecutiveErrors = 0;
+          SERVER_STATS.lowFee.executedCount++;
+          SERVER_STATS.lowFee.realizedPnLUSD += netUSD;
+          savePersistedStats();
+          this.isExecuting = false;
+          return true;
+        }
+
         addScanLog(`🚀 [DISPARO LOW-FEE ${isBase ? 'BASE' : 'ARBITRUM'}] ${pairName}...`, 'LOW_FEE');
 
         const tx = isBalancer
@@ -365,6 +377,18 @@ export class LowFeeExecutor {
         }
 
         const gasLimit = (gasEstimated * 115n) / 100n;
+
+        if (ENV.dryRun) {
+          logger.info(`🧪 [DRY RUN VALIDADO LOW-FEE SPOT] Spot en ${pairName} | Spread: ${formattedSpread}% | Net: +$${netUSD} USD. Omitiendo tx real.`);
+          addScanLog(`🧪 [DRY RUN LOW-FEE SPOT] Spot validado en ${pairName} (Net: +$${netUSD} USD).`, 'LOW_FEE');
+          this.consecutiveErrors = 0;
+          SERVER_STATS.lowFee.executedCount++;
+          SERVER_STATS.lowFee.realizedPnLUSD += netUSD;
+          savePersistedStats();
+          this.isExecuting = false;
+          return true;
+        }
+
         const tx = await contract.executeSpotSpatial(routeStruct, profitableSpot, { gasLimit });
         const receipt = await tx.wait(1);
 

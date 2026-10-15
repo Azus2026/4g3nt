@@ -16,7 +16,7 @@ async function main() {
 
   // 1. Desplegar Contrato
   console.log("📦 Compilando y transmitiendo transacción de despliegue...");
-  const ArbitrageFactory = await ethers.getContractFactory("BaseMultiDexArbitrage");
+  const ArbitrageFactory = await ethers.getContractFactory("BaseUniversalArbitrage");
   const contract = await ArbitrageFactory.deploy();
   await contract.waitForDeployment();
 

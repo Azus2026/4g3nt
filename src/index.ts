@@ -98,8 +98,12 @@ async function main() {
   // 7. Notificar a Telegram
   await telegramNotifier.notifyStartup(MULTI_CHAIN_ARBITRAGE_PAIRS.length, SWARM_AGENTS.length).catch(() => {});
 
-  // 8. Arrancar ciclo del Cluster
-  await swarmManager.startSwarmLoop();
+  // 8. Arquitectura MEV Reactiva por Eventos
+  // Los escaneos son disparados en tiempo real por el Sequencer Feed de Arbitrum (<10ms)
+  // y los Flashblocks de Base (200ms) sin sobrecargar RPCs ni generar telemetría falsa.
+  // Para activar el bucle continuo tradicional del Swarm:
+  // await swarmManager.startSwarmLoop();
+  logger.success(`🔥 Motores de Arbitraje Activos: Escuchando eventos de Sequencer Feed y Flashblocks.`);
 }
 
 main().catch((err) => {

@@ -4,6 +4,9 @@ import { logger } from '../utils/logger';
 import { SERVER_STATS, addScanLog, addSpotOpportunity, addFlashOpportunity } from '../server';
 import { savePersistedStats } from '../utils/statsStore';
 import { SweetSpotOptimizer } from '../math/sweetSpotOptimizer';
+import { cexLagPredictor } from '../scanners/cexLagPredictor';
+
+const getEthPriceUSD = (): number => cexLagPredictor.getCEXPrice('ETH') || 2500;
 
 // Contrato Universal de Arbitraje Desplegado en Base (ChainID 8453)
 export const ARBITRAGE_CONTRACT_BASE = ENV.arbitrageContractBase || '0xdA593D75439364a864a92416430FFA1268724059';
@@ -276,15 +279,17 @@ export class SpotExecutor {
       let tradeCapUSD = 0;
 
       if (isProfitable && simulatedProfitWei > 0n) {
+        const ethPrice = getEthPriceUSD();
         const realProfitETH = parseFloat(ethers.formatEther(simulatedProfitWei));
         tradeCapUSD = profitableSpotAmount
-          ? parseFloat(ethers.formatEther(profitableSpotAmount)) * 2500
-          : parseFloat(ethers.formatEther(profitableFlashAmount!)) * 2500;
-        formattedSpread = tradeCapUSD > 0 ? parseFloat((((realProfitETH * 2500) / tradeCapUSD) * 100).toFixed(3)) : 0;
-        grossUSD = parseFloat((realProfitETH * 2500).toFixed(4));
+          ? parseFloat(ethers.formatEther(profitableSpotAmount)) * ethPrice
+          : parseFloat(ethers.formatEther(profitableFlashAmount!)) * ethPrice;
+        formattedSpread = tradeCapUSD > 0 ? parseFloat((((realProfitETH * ethPrice) / tradeCapUSD) * 100).toFixed(3)) : 0;
+        grossUSD = parseFloat((realProfitETH * ethPrice).toFixed(4));
       }
 
-      const gasEst = SweetSpotOptimizer.calculateTotalGasCostUSD(8453, 220_000n, 0.05, 2500, 384);
+      const ethPrice = getEthPriceUSD();
+      const gasEst = SweetSpotOptimizer.calculateTotalGasCostUSD(8453, 220_000n, 0.05, ethPrice, 384);
       const gasUSD = gasEst.totalGasUSD;
       const netUSD = isProfitable ? Math.max(0, parseFloat((grossUSD - gasUSD).toFixed(4))) : 0;
 
@@ -509,15 +514,17 @@ export class SpotExecutor {
       let triCapUSD = 0;
 
       if (isProfitable && simulatedProfitWei > 0n) {
+        const ethPrice = getEthPriceUSD();
         const realProfitETH = parseFloat(ethers.formatEther(simulatedProfitWei));
         triCapUSD = profitableSpotAmount
-          ? parseFloat(ethers.formatEther(profitableSpotAmount)) * 2500
-          : parseFloat(ethers.formatEther(profitableFlashAmount!)) * 2500;
-        formattedTriSpread = triCapUSD > 0 ? parseFloat((((realProfitETH * 2500) / triCapUSD) * 100).toFixed(3)) : 0;
-        triGrossUSD = parseFloat((realProfitETH * 2500).toFixed(4));
+          ? parseFloat(ethers.formatEther(profitableSpotAmount)) * ethPrice
+          : parseFloat(ethers.formatEther(profitableFlashAmount!)) * ethPrice;
+        formattedTriSpread = triCapUSD > 0 ? parseFloat((((realProfitETH * ethPrice) / triCapUSD) * 100).toFixed(3)) : 0;
+        triGrossUSD = parseFloat((realProfitETH * ethPrice).toFixed(4));
       }
 
-      const triGasEst = SweetSpotOptimizer.calculateTotalGasCostUSD(8453, 280_000n, 0.05, 2500, 512);
+      const triEthPrice = getEthPriceUSD();
+      const triGasEst = SweetSpotOptimizer.calculateTotalGasCostUSD(8453, 280_000n, 0.05, triEthPrice, 512);
       const triGasUSD = triGasEst.totalGasUSD;
       const triNetUSD = isProfitable ? Math.max(0, parseFloat((triGrossUSD - triGasUSD).toFixed(4))) : 0;
 

@@ -26,7 +26,7 @@ export class ArbitrumSequencerFeedListener {
   private endpoint: string;
   private onBatchCallback?: (count: number) => void;
 
-  constructor(endpoint: string = 'wss://arb1.arbitrum.io/feed', onBatch?: (count: number) => void) {
+  constructor(endpoint: string = ENV.arbitrumWssUrl || 'wss://arb1-feed.arbitrum.io/feed', onBatch?: (count: number) => void) {
     this.endpoint = endpoint;
     this.onBatchCallback = onBatch;
   }
@@ -176,7 +176,7 @@ export class MempoolListener {
 
   constructor(wssUrl: string, chainId: number, onSignal: (signal: PendingSwapSignal) => void) {
     if (chainId === 42161) {
-      this.arbFeed = new ArbitrumSequencerFeedListener(wssUrl || 'wss://arb1.arbitrum.io/feed', (count) => {
+      this.arbFeed = new ArbitrumSequencerFeedListener(wssUrl || ENV.arbitrumWssUrl || 'wss://arb1-feed.arbitrum.io/feed', (count) => {
         onSignal({
           chainId: 42161,
           hash: `seq-${Date.now()}-${count}`,

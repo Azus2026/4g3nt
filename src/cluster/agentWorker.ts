@@ -166,30 +166,9 @@ export class AgentWorker {
           isProfitable = netProfitUSD >= ENV.minProfitUSD;
         }
       } else if (armada.id === 2) {
-        // ⚡ Armada 2: Liquidaciones Flash en Aave V3 y Compound V3 (Bono 5-10%)
-        const candidates = getSampleLiquidationCandidates();
-        const cand = candidates.find(c => c.chainId === pair.chainId && (c.debtToken.symbol === pair.tokenA.symbol || c.collateralToken.symbol === pair.tokenA.symbol));
-        if (cand) {
-          const liqOpp = liquidationScanner.evaluateLiquidation(cand);
-          if (liqOpp && liqOpp.isExecutable) {
-            customOpp = liqOpp;
-            loanAmountToUse = (liqOpp.flashLoanAmountUSD / (pair.approxPriceUSD || 2500)).toFixed(6);
-            netProfitUSD = liqOpp.netProfitUSD;
-            grossProfitUSD = liqOpp.expectedGrossBonusUSD;
-            isProfitable = netProfitUSD >= ENV.minProfitUSD;
-          }
-        }
-        // Fallback: Cross-DEX L2 Rápido
-        if (!isProfitable) {
-          const microOpp = subCentMicroArbEngine.evaluateMicroOpportunity(pair);
-          if (microOpp && microOpp.isViable) {
-            loanAmountToUse = (microOpp.optimalLoanUSD / (pair.approxPriceUSD || 2500)).toFixed(6);
-            netProfitUSD = microOpp.netProfitUSD;
-            grossProfitUSD = microOpp.grossProfitUSD;
-            isProfitable = netProfitUSD >= ENV.minProfitUSD;
-            customOpp = microOpp;
-          }
-        }
+        // ⚡ Armada 2: Liquidaciones Flash (Desactivado mocks para evitar datos falsos)
+        // Solo opera si existen eventos on-chain reales validados
+        isProfitable = false;
       } else if (armada.id === 3) {
         // 📡 Armada 3: CEX-DEX Lag Predictors (Binance Real-Time WebSocket HFT)
         const cexLag = cexLagPredictor.evaluateDEXLag(pair.tokenA.symbol, price1);
@@ -204,27 +183,8 @@ export class AgentWorker {
           }
         }
       } else {
-        // 🎯 Armada 4: CoW Swap & UniswapX Intent Solving (Batch Auctions)
-        const sampleBatchOrder = {
-          id: `BATCH-${pair.id}`,
-          sellToken: pair.tokenA.symbol,
-          buyToken: pair.tokenB.symbol,
-          sellAmountUSD: 15000,
-          buyAmountUSD: 15000,
-          limitPrice: (pair.approxPriceUSD || 2500) * 0.995,
-          marketPrice: (pair.approxPriceUSD || 2500),
-          spreadPercent: 0.50,
-          clearingPriceUSD: pair.approxPriceUSD || 2500,
-          chainId: pair.chainId
-        };
-        const cowOpp = cowSwapSolver.evaluateBatchOpportunity(sampleBatchOrder);
-        if (cowOpp && cowOpp.isExecutable) {
-          customOpp = cowOpp;
-          loanAmountToUse = (cowOpp.flashLoanRequiredUSD / (pair.approxPriceUSD || 2500)).toFixed(6);
-          netProfitUSD = cowOpp.netProfitUSD;
-          grossProfitUSD = cowOpp.surplusUSD;
-          isProfitable = netProfitUSD >= ENV.minProfitUSD;
-        }
+        // 🎯 Armada 4: CoW Swap & Intent Solving (Desactivado mocks para evitar datos falsos)
+        isProfitable = false;
       }
 
 function getProtocolFeeRate(protocolId: string): number {

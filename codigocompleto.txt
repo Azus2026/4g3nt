@@ -1,7 +1,7 @@
 ===============================================================================
   SISTEMA COMPLETO DE ARBITRAJE MEV CON FLASH LOANS (ARBITRUM & BASE)
   CÓDIGO FUENTE AUDITADO, ESTRUCTURADO Y CORREGIDO (FASES 1 A 5 COMPLETADAS)
-  Fecha de Generación: 2026-10-15T22:15:57.079Z
+  Fecha de Generación: 2026-10-15T23:10:11.263Z
 ===============================================================================
 
 ÍNDICE GENERAL DE ARCHIVOS INCLUIDOS:
@@ -1245,7 +1245,7 @@ export const ENV = {
   port: parseInt(process.env.PORT || '3000', 10),
   arbitrageContractBase: process.env.ARBITRAGE_CONTRACT_BASE || '0xdA593D75439364a864a92416430FFA1268724059',
   arbitrageContractArbitrum: process.env.ARBITRAGE_CONTRACT_ARBITRUM || '0xfD164F1b738FE3594C33A569Aa4F21D1855A47E2',
-  arbitrumWssUrl: process.env.ARBITRUM_WSS_URL || 'wss://arb1.arbitrum.io/feed',
+  arbitrumWssUrl: process.env.ARBITRUM_WSS_URL || 'wss://arb1-feed.arbitrum.io/feed',
   baseWssUrl: process.env.BASE_WSS_URL || 'wss://base-rpc.publicnode.com',
 };
 
@@ -1581,10 +1581,10 @@ export const TOKENS: Record<string, TokenConfig> = {
   DAI_ARB:    { chainId: 42161, address: '0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1', decimals: 18, symbol: 'DAI', name: 'Dai' },
   ARB_ARB:    { chainId: 42161, address: '0x912CE59144191C1204E64559FE8253a0e49E6548', decimals: 18, symbol: 'ARB', name: 'Arbitrum' },
   WBTC_ARB:   { chainId: 42161, address: '0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f', decimals: 8, symbol: 'WBTC', name: 'Wrapped BTC' },
-  GMX_ARB:    { chainId: 42161, address: '0xf4756139c151178f965539a4a0ee8077c449c433', decimals: 18, symbol: 'GMX', name: 'GMX' },
+  GMX_ARB:    { chainId: 42161, address: '0xfc5A1A6EB076a2C7aD06eD22C90d7E710E35ad0a', decimals: 18, symbol: 'GMX', name: 'GMX' },
   GRAIL_ARB:  { chainId: 42161, address: '0x3d9907F9a3680ECa11B675E16CCcf187122CEB77', decimals: 18, symbol: 'GRAIL', name: 'Camelot Grail' },
-  PENDLE_ARB: { chainId: 42161, address: '0x0c880f6702e96d4cf45347f382a9be740e698888', decimals: 18, symbol: 'PENDLE', name: 'Pendle' },
-  MAGIC_ARB:  { chainId: 42161, address: '0x539bE5761a1107D14701073786AD49223847ac1F', decimals: 18, symbol: 'MAGIC', name: 'Magic' },
+  PENDLE_ARB: { chainId: 42161, address: '0x0c880f6761F1af8d9Aa9C466984b80DAb9a8c9e8', decimals: 18, symbol: 'PENDLE', name: 'Pendle' },
+  MAGIC_ARB:  { chainId: 42161, address: '0x539bdE0d7Dbd336b79148AA742883198BBBE6034', decimals: 18, symbol: 'MAGIC', name: 'Magic' },
   RDNT_ARB:   { chainId: 42161, address: '0x3082CC23568eA640225c2467653dB90e9250AaA0', decimals: 18, symbol: 'RDNT', name: 'Radiant' },
   STG_ARB:    { chainId: 42161, address: '0x6694340fc020c5E6B96567843da2df01b2CE1eb6', decimals: 18, symbol: 'STG', name: 'Stargate' },
   LINK_ARB:   { chainId: 42161, address: '0xf97f4df75117a78c1A5a0DBb814Af92458539FB4', decimals: 18, symbol: 'LINK', name: 'Chainlink' },
@@ -1616,7 +1616,7 @@ export const TOKENS: Record<string, TokenConfig> = {
   BRETT_BASE:   { chainId: 8453, address: '0x532f27101965dd16442E59d40670FaF5eBB142E4', decimals: 18, symbol: 'BRETT', name: 'Brett' },
   DEGEN_BASE:   { chainId: 8453, address: '0x4ed4E862860bed51a9570b96d89af5e1b0Efefed', decimals: 18, symbol: 'DEGEN', name: 'Degen' },
   VIRTUAL_BASE: { chainId: 8453, address: '0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b', decimals: 18, symbol: 'VIRTUAL', name: 'Virtual Protocol' },
-  TOSHI_BASE:   { chainId: 8453, address: '0xAC1Bd2447a10150d01025454429261ED16f57B66', decimals: 18, symbol: 'TOSHI', name: 'Toshi' },
+  TOSHI_BASE:   { chainId: 8453, address: '0xAC1Bd2486aAf3B5C0fc3Fd868558b082a531B2B4', decimals: 18, symbol: 'TOSHI', name: 'Toshi' },
   HIGHER_BASE:  { chainId: 8453, address: '0x0578d8A44db98B23BF096A382e016e29a5Ce0ffe', decimals: 18, symbol: 'HIGHER', name: 'Higher' },
   CLANKER_BASE: { chainId: 8453, address: '0x1bc0c42215582d5A085795f4baDbaC3ff36d1Bcb', decimals: 18, symbol: 'CLANKER', name: 'Clanker' },
   MIGGLES_BASE: { chainId: 8453, address: '0xB1a03E715470566e97C1a97F67f053CE4d07e559', decimals: 18, symbol: 'MIGGLES', name: 'Miggles' },
@@ -2503,6 +2503,9 @@ import { logger } from '../utils/logger';
 import { SERVER_STATS, addScanLog, addSpotOpportunity, addFlashOpportunity } from '../server';
 import { savePersistedStats } from '../utils/statsStore';
 import { SweetSpotOptimizer } from '../math/sweetSpotOptimizer';
+import { cexLagPredictor } from '../scanners/cexLagPredictor';
+
+const getEthPriceUSD = (): number => cexLagPredictor.getCEXPrice('ETH') || 2500;
 
 // Contrato Universal de Arbitraje Desplegado en Base (ChainID 8453)
 export const ARBITRAGE_CONTRACT_BASE = ENV.arbitrageContractBase || '0xdA593D75439364a864a92416430FFA1268724059';
@@ -2775,15 +2778,17 @@ export class SpotExecutor {
       let tradeCapUSD = 0;
 
       if (isProfitable && simulatedProfitWei > 0n) {
+        const ethPrice = getEthPriceUSD();
         const realProfitETH = parseFloat(ethers.formatEther(simulatedProfitWei));
         tradeCapUSD = profitableSpotAmount
-          ? parseFloat(ethers.formatEther(profitableSpotAmount)) * 2500
-          : parseFloat(ethers.formatEther(profitableFlashAmount!)) * 2500;
-        formattedSpread = tradeCapUSD > 0 ? parseFloat((((realProfitETH * 2500) / tradeCapUSD) * 100).toFixed(3)) : 0;
-        grossUSD = parseFloat((realProfitETH * 2500).toFixed(4));
+          ? parseFloat(ethers.formatEther(profitableSpotAmount)) * ethPrice
+          : parseFloat(ethers.formatEther(profitableFlashAmount!)) * ethPrice;
+        formattedSpread = tradeCapUSD > 0 ? parseFloat((((realProfitETH * ethPrice) / tradeCapUSD) * 100).toFixed(3)) : 0;
+        grossUSD = parseFloat((realProfitETH * ethPrice).toFixed(4));
       }
 
-      const gasEst = SweetSpotOptimizer.calculateTotalGasCostUSD(8453, 220_000n, 0.05, 2500, 384);
+      const ethPrice = getEthPriceUSD();
+      const gasEst = SweetSpotOptimizer.calculateTotalGasCostUSD(8453, 220_000n, 0.05, ethPrice, 384);
       const gasUSD = gasEst.totalGasUSD;
       const netUSD = isProfitable ? Math.max(0, parseFloat((grossUSD - gasUSD).toFixed(4))) : 0;
 
@@ -3008,15 +3013,17 @@ export class SpotExecutor {
       let triCapUSD = 0;
 
       if (isProfitable && simulatedProfitWei > 0n) {
+        const ethPrice = getEthPriceUSD();
         const realProfitETH = parseFloat(ethers.formatEther(simulatedProfitWei));
         triCapUSD = profitableSpotAmount
-          ? parseFloat(ethers.formatEther(profitableSpotAmount)) * 2500
-          : parseFloat(ethers.formatEther(profitableFlashAmount!)) * 2500;
-        formattedTriSpread = triCapUSD > 0 ? parseFloat((((realProfitETH * 2500) / triCapUSD) * 100).toFixed(3)) : 0;
-        triGrossUSD = parseFloat((realProfitETH * 2500).toFixed(4));
+          ? parseFloat(ethers.formatEther(profitableSpotAmount)) * ethPrice
+          : parseFloat(ethers.formatEther(profitableFlashAmount!)) * ethPrice;
+        formattedTriSpread = triCapUSD > 0 ? parseFloat((((realProfitETH * ethPrice) / triCapUSD) * 100).toFixed(3)) : 0;
+        triGrossUSD = parseFloat((realProfitETH * ethPrice).toFixed(4));
       }
 
-      const triGasEst = SweetSpotOptimizer.calculateTotalGasCostUSD(8453, 280_000n, 0.05, 2500, 512);
+      const triEthPrice = getEthPriceUSD();
+      const triGasEst = SweetSpotOptimizer.calculateTotalGasCostUSD(8453, 280_000n, 0.05, triEthPrice, 512);
       const triGasUSD = triGasEst.totalGasUSD;
       const triNetUSD = isProfitable ? Math.max(0, parseFloat((triGrossUSD - triGasUSD).toFixed(4))) : 0;
 
@@ -3232,6 +3239,9 @@ import { logger } from '../utils/logger';
 import { SERVER_STATS, addScanLog, addFlashOpportunity } from '../server';
 import { savePersistedStats } from '../utils/statsStore';
 import { SweetSpotOptimizer } from '../math/sweetSpotOptimizer';
+import { cexLagPredictor } from '../scanners/cexLagPredictor';
+
+const getEthPriceUSD = (): number => cexLagPredictor.getCEXPrice('ETH') || 2500;
 
 // Contrato Universal de Arbitraje Desplegado en Arbitrum One (ChainID 42161)
 export const ARBITRAGE_CONTRACT_ARBITRUM = ENV.arbitrageContractArbitrum || '0x2bE126e838bC253457a44f56f10352ff15d2B23F';
@@ -3469,13 +3479,15 @@ export class ArbitrumExecutor {
       let loanUSD = 0;
 
       if (isProfitable && simulatedProfitWei > 0n) {
+        const ethPrice = getEthPriceUSD();
         const realProfitETH = parseFloat(ethers.formatEther(simulatedProfitWei));
-        loanUSD = parseFloat(ethers.formatEther(profitableFlashAmount!)) * 2500;
-        formattedSpread = loanUSD > 0 ? parseFloat((((realProfitETH * 2500) / loanUSD) * 100).toFixed(3)) : 0;
-        grossUSD = parseFloat((realProfitETH * 2500).toFixed(2));
+        loanUSD = parseFloat(ethers.formatEther(profitableFlashAmount!)) * ethPrice;
+        formattedSpread = loanUSD > 0 ? parseFloat((((realProfitETH * ethPrice) / loanUSD) * 100).toFixed(3)) : 0;
+        grossUSD = parseFloat((realProfitETH * ethPrice).toFixed(2));
       }
 
-      const arbGasEst = SweetSpotOptimizer.calculateTotalGasCostUSD(42161, 280_000n, 0.1, 2500, 384);
+      const ethPrice = getEthPriceUSD();
+      const arbGasEst = SweetSpotOptimizer.calculateTotalGasCostUSD(42161, 280_000n, 0.1, ethPrice, 384);
       const netUSD = isProfitable ? Math.max(0, parseFloat((grossUSD - arbGasEst.totalGasUSD).toFixed(2))) : 0;
 
       addFlashOpportunity({
@@ -3630,13 +3642,15 @@ export class ArbitrumExecutor {
       let loanUSD = 0;
 
       if (isProfitable && simulatedProfitWei > 0n) {
+        const ethPrice = getEthPriceUSD();
         const realProfitETH = parseFloat(ethers.formatEther(simulatedProfitWei));
-        loanUSD = parseFloat(ethers.formatEther(profitableFlashAmount!)) * 2500;
-        formattedTriSpread = loanUSD > 0 ? parseFloat((((realProfitETH * 2500) / loanUSD) * 100).toFixed(3)) : 0;
-        triGrossUSD = parseFloat((realProfitETH * 2500).toFixed(2));
+        loanUSD = parseFloat(ethers.formatEther(profitableFlashAmount!)) * ethPrice;
+        formattedTriSpread = loanUSD > 0 ? parseFloat((((realProfitETH * ethPrice) / loanUSD) * 100).toFixed(3)) : 0;
+        triGrossUSD = parseFloat((realProfitETH * ethPrice).toFixed(2));
       }
 
-      const triGasEst = SweetSpotOptimizer.calculateTotalGasCostUSD(42161, 350_000n, 0.1, 2500, 512);
+      const triEthPrice = getEthPriceUSD();
+      const triGasEst = SweetSpotOptimizer.calculateTotalGasCostUSD(42161, 350_000n, 0.1, triEthPrice, 512);
       const triNetUSD = isProfitable ? Math.max(0, parseFloat((triGrossUSD - triGasEst.totalGasUSD).toFixed(2))) : 0;
 
       addFlashOpportunity({
@@ -3788,6 +3802,7 @@ import { ENV } from '../config/env';
 import { logger } from '../utils/logger';
 import { SERVER_STATS, addScanLog, addLowFeeOpportunity } from '../server';
 import { savePersistedStats } from '../utils/statsStore';
+import { cexLagPredictor } from '../scanners/cexLagPredictor';
 
 // Contratos Universales
 const CONTRACT_BASE = ENV.arbitrageContractBase || '0xdA593D75439364a864a92416430FFA1268724059';
@@ -4071,7 +4086,7 @@ export class LowFeeExecutor {
         const amt = profitableSpot || profitableFlash!;
         const amtNum = parseFloat(ethers.formatUnits(amt, decimalsIn));
         const profitNum = parseFloat(ethers.formatUnits(simulatedProfit, decimalsIn));
-        const priceUSD = decimalsIn === 6 ? 1.0 : 2500.0;
+        const priceUSD = decimalsIn === 6 ? 1.0 : (cexLagPredictor.getCEXPrice('ETH') || 2500.0);
 
         loanUSD = amtNum * priceUSD;
         grossUSD = parseFloat((profitNum * priceUSD).toFixed(2));
@@ -4859,7 +4874,7 @@ export class ArbitrumSequencerFeedListener {
   private endpoint: string;
   private onBatchCallback?: (count: number) => void;
 
-  constructor(endpoint: string = 'wss://arb1.arbitrum.io/feed', onBatch?: (count: number) => void) {
+  constructor(endpoint: string = ENV.arbitrumWssUrl || 'wss://arb1-feed.arbitrum.io/feed', onBatch?: (count: number) => void) {
     this.endpoint = endpoint;
     this.onBatchCallback = onBatch;
   }
@@ -5009,7 +5024,7 @@ export class MempoolListener {
 
   constructor(wssUrl: string, chainId: number, onSignal: (signal: PendingSwapSignal) => void) {
     if (chainId === 42161) {
-      this.arbFeed = new ArbitrumSequencerFeedListener(wssUrl || 'wss://arb1.arbitrum.io/feed', (count) => {
+      this.arbFeed = new ArbitrumSequencerFeedListener(wssUrl || ENV.arbitrumWssUrl || 'wss://arb1-feed.arbitrum.io/feed', (count) => {
         onSignal({
           chainId: 42161,
           hash: `seq-${Date.now()}-${count}`,
@@ -6935,30 +6950,9 @@ export class AgentWorker {
           isProfitable = netProfitUSD >= ENV.minProfitUSD;
         }
       } else if (armada.id === 2) {
-        // ⚡ Armada 2: Liquidaciones Flash en Aave V3 y Compound V3 (Bono 5-10%)
-        const candidates = getSampleLiquidationCandidates();
-        const cand = candidates.find(c => c.chainId === pair.chainId && (c.debtToken.symbol === pair.tokenA.symbol || c.collateralToken.symbol === pair.tokenA.symbol));
-        if (cand) {
-          const liqOpp = liquidationScanner.evaluateLiquidation(cand);
-          if (liqOpp && liqOpp.isExecutable) {
-            customOpp = liqOpp;
-            loanAmountToUse = (liqOpp.flashLoanAmountUSD / (pair.approxPriceUSD || 2500)).toFixed(6);
-            netProfitUSD = liqOpp.netProfitUSD;
-            grossProfitUSD = liqOpp.expectedGrossBonusUSD;
-            isProfitable = netProfitUSD >= ENV.minProfitUSD;
-          }
-        }
-        // Fallback: Cross-DEX L2 Rápido
-        if (!isProfitable) {
-          const microOpp = subCentMicroArbEngine.evaluateMicroOpportunity(pair);
-          if (microOpp && microOpp.isViable) {
-            loanAmountToUse = (microOpp.optimalLoanUSD / (pair.approxPriceUSD || 2500)).toFixed(6);
-            netProfitUSD = microOpp.netProfitUSD;
-            grossProfitUSD = microOpp.grossProfitUSD;
-            isProfitable = netProfitUSD >= ENV.minProfitUSD;
-            customOpp = microOpp;
-          }
-        }
+        // ⚡ Armada 2: Liquidaciones Flash (Desactivado mocks para evitar datos falsos)
+        // Solo opera si existen eventos on-chain reales validados
+        isProfitable = false;
       } else if (armada.id === 3) {
         // 📡 Armada 3: CEX-DEX Lag Predictors (Binance Real-Time WebSocket HFT)
         const cexLag = cexLagPredictor.evaluateDEXLag(pair.tokenA.symbol, price1);
@@ -6973,27 +6967,8 @@ export class AgentWorker {
           }
         }
       } else {
-        // 🎯 Armada 4: CoW Swap & UniswapX Intent Solving (Batch Auctions)
-        const sampleBatchOrder = {
-          id: `BATCH-${pair.id}`,
-          sellToken: pair.tokenA.symbol,
-          buyToken: pair.tokenB.symbol,
-          sellAmountUSD: 15000,
-          buyAmountUSD: 15000,
-          limitPrice: (pair.approxPriceUSD || 2500) * 0.995,
-          marketPrice: (pair.approxPriceUSD || 2500),
-          spreadPercent: 0.50,
-          clearingPriceUSD: pair.approxPriceUSD || 2500,
-          chainId: pair.chainId
-        };
-        const cowOpp = cowSwapSolver.evaluateBatchOpportunity(sampleBatchOrder);
-        if (cowOpp && cowOpp.isExecutable) {
-          customOpp = cowOpp;
-          loanAmountToUse = (cowOpp.flashLoanRequiredUSD / (pair.approxPriceUSD || 2500)).toFixed(6);
-          netProfitUSD = cowOpp.netProfitUSD;
-          grossProfitUSD = cowOpp.surplusUSD;
-          isProfitable = netProfitUSD >= ENV.minProfitUSD;
-        }
+        // 🎯 Armada 4: CoW Swap & Intent Solving (Desactivado mocks para evitar datos falsos)
+        isProfitable = false;
       }
 
 function getProtocolFeeRate(protocolId: string): number {
@@ -7310,8 +7285,12 @@ async function main() {
   // 7. Notificar a Telegram
   await telegramNotifier.notifyStartup(MULTI_CHAIN_ARBITRAGE_PAIRS.length, SWARM_AGENTS.length).catch(() => {});
 
-  // 8. Arrancar ciclo del Cluster
-  await swarmManager.startSwarmLoop();
+  // 8. Arquitectura MEV Reactiva por Eventos
+  // Los escaneos son disparados en tiempo real por el Sequencer Feed de Arbitrum (<10ms)
+  // y los Flashblocks de Base (200ms) sin sobrecargar RPCs ni generar telemetría falsa.
+  // Para activar el bucle continuo tradicional del Swarm:
+  // await swarmManager.startSwarmLoop();
+  logger.success(`🔥 Motores de Arbitraje Activos: Escuchando eventos de Sequencer Feed y Flashblocks.`);
 }
 
 main().catch((err) => {
@@ -8493,7 +8472,7 @@ async function main() {
     "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed", // DEGEN
     "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b", // VIRTUAL
     "0x532f27101965dd16442E59d40670FaF5eBB142E4", // BRETT
-    "0xAC1bD2447a10150D01025454429261eD16f57b66", // TOSHI
+    "0xAC1Bd2486aAf3B5C0fc3Fd868558b082a531B2B4", // TOSHI
   ];
 
   console.log("⚡ Ejecutando approveRouters() para los 9 tokens clave...");

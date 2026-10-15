@@ -35,7 +35,7 @@ async function main() {
     "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed", // DEGEN
     "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b", // VIRTUAL
     "0x532f27101965dd16442E59d40670FaF5eBB142E4", // BRETT
-    "0xAC1bD2447a10150D01025454429261eD16f57b66", // TOSHI
+    "0xAC1Bd2486aAf3B5C0fc3Fd868558b082a531B2B4", // TOSHI
   ];
 
   console.log("⚡ Ejecutando approveRouters() para los 9 tokens clave...");

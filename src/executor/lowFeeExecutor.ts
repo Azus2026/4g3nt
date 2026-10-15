@@ -3,6 +3,7 @@ import { ENV } from '../config/env';
 import { logger } from '../utils/logger';
 import { SERVER_STATS, addScanLog, addLowFeeOpportunity } from '../server';
 import { savePersistedStats } from '../utils/statsStore';
+import { cexLagPredictor } from '../scanners/cexLagPredictor';
 
 // Contratos Universales
 const CONTRACT_BASE = ENV.arbitrageContractBase || '0xdA593D75439364a864a92416430FFA1268724059';
@@ -286,7 +287,7 @@ export class LowFeeExecutor {
         const amt = profitableSpot || profitableFlash!;
         const amtNum = parseFloat(ethers.formatUnits(amt, decimalsIn));
         const profitNum = parseFloat(ethers.formatUnits(simulatedProfit, decimalsIn));
-        const priceUSD = decimalsIn === 6 ? 1.0 : 2500.0;
+        const priceUSD = decimalsIn === 6 ? 1.0 : (cexLagPredictor.getCEXPrice('ETH') || 2500.0);
 
         loanUSD = amtNum * priceUSD;
         grossUSD = parseFloat((profitNum * priceUSD).toFixed(2));

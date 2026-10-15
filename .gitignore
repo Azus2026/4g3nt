@@ -6,3 +6,6 @@ typechain-types/
 .env
 .DS_Store
 *.log
+*.tar.gz
+*.tar
+*.zip

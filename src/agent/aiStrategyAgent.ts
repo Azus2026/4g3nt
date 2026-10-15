@@ -61,11 +61,12 @@ export class AIStrategyAgent {
 
     // Decisión final
     let recommendation: 'EXECUTE' | 'SKIP' | 'SIMULATE_ONLY' = 'SKIP';
+    const isDifferent = opportunity.leg1.protocolId.toLowerCase() !== opportunity.leg2.protocolId.toLowerCase();
 
-    if (opportunity.isProfitable) {
+    if (opportunity.isProfitable && isDifferent) {
       recommendation = ENV.dryRun ? 'SIMULATE_ONLY' : 'EXECUTE';
-    } else if (opportunity.netProfitUSD > 0) {
-      recommendation = 'SIMULATE_ONLY';
+    } else {
+      recommendation = 'SKIP';
     }
 
     return {

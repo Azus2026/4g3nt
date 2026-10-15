@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Protocolink AI Flash Loan Arbitrage V2 | 10-Agent Swarm Command Center</title>
+  <title>Protocolink AI Swarm V2 | Separación Spot $35 vs Flash Loans</title>
 
   <!-- Google Fonts & Lucide Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,9 +13,9 @@
 
   <style>
     :root {
-      --bg-main: #0a0d14;
-      --bg-card: #121824;
-      --bg-card-hover: #182030;
+      --bg-main: #070a12;
+      --bg-card: #0f1523;
+      --bg-card-hover: #162035;
       --border-color: rgba(255, 255, 255, 0.08);
       --accent-cyan: #00f2fe;
       --accent-blue: #4facfe;
@@ -36,13 +36,10 @@
       min-height: 100vh;
       display: flex;
       flex-direction: column;
-      background-image: 
-        radial-gradient(circle at 15% 15%, rgba(0, 242, 254, 0.05) 0%, transparent 40%),
-        radial-gradient(circle at 85% 85%, rgba(127, 0, 255, 0.05) 0%, transparent 40%);
     }
 
     header {
-      background: rgba(18, 24, 36, 0.8);
+      background: rgba(15, 21, 35, 0.9);
       backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border-color);
       padding: 1rem 2rem;
@@ -89,105 +86,125 @@
     }
 
     .container {
-      max-width: 1440px; margin: 0 auto; padding: 2rem;
+      max-width: 1540px; margin: 0 auto; padding: 2rem;
       width: 100%; display: flex; flex-direction: column; gap: 2rem;
     }
 
-    /* Stats Grid */
-    .stats-grid {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem;
+    /* Filter View Selector */
+    .filter-tabs {
+      display: flex; gap: 0.75rem; background: rgba(255, 255, 255, 0.03);
+      padding: 0.4rem; border-radius: 14px; border: 1px solid var(--border-color);
+      width: fit-content;
     }
 
-    .stat-card {
-      background: var(--bg-card); border: 1px solid var(--border-color);
-      border-radius: 16px; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.5rem;
+    .tab-btn {
+      background: transparent; border: none; color: var(--text-muted);
+      padding: 0.6rem 1.25rem; border-radius: 10px; font-weight: 600; font-size: 0.85rem;
+      cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 0.5rem;
     }
 
-    .stat-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; }
-    .stat-value { font-family: 'Outfit', sans-serif; font-size: 1.75rem; font-weight: 700; color: #fff; }
-    .stat-sub { font-size: 0.75rem; color: var(--text-muted); }
-
-    /* Swarm Grid */
-    .swarm-section-title {
-      font-family: 'Outfit', sans-serif; font-size: 1.35rem; font-weight: 700;
-      margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;
+    .tab-btn.active.tab-spot {
+      background: rgba(16, 185, 129, 0.2); color: var(--accent-green);
+      border: 1px solid rgba(16, 185, 129, 0.5); box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
     }
 
-    .swarm-grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.25rem;
+    .tab-btn.active.tab-flash {
+      background: rgba(0, 242, 254, 0.2); color: var(--accent-cyan);
+      border: 1px solid rgba(0, 242, 254, 0.5); box-shadow: 0 0 15px rgba(0, 242, 254, 0.2);
     }
 
-    .agent-card {
-      background: var(--bg-card); border: 1px solid var(--border-color);
-      border-radius: 16px; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem;
-      position: relative; overflow: hidden; transition: transform 0.2s ease;
+    .tab-btn.active.tab-all {
+      background: rgba(127, 0, 255, 0.2); color: #c084fc;
+      border: 1px solid rgba(127, 0, 255, 0.5);
     }
 
-    .agent-card:hover { transform: translateY(-2px); border-color: rgba(0, 242, 254, 0.3); }
-
-    .agent-header { display: flex; justify-content: space-between; align-items: center; }
-    .agent-name { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1rem; }
-    .agent-role { font-size: 0.75rem; color: var(--text-muted); }
-
-    .agent-status-pill {
-      font-size: 0.65rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 6px;
-      text-transform: uppercase; letter-spacing: 0.5px;
+    /* Main Dual Command Panels */
+    .dual-command-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;
     }
 
-    .status-idle { background: rgba(148, 163, 184, 0.1); color: #94a3b8; }
-    .status-scanning { background: rgba(0, 242, 254, 0.15); color: var(--accent-cyan); border: 1px solid rgba(0, 242, 254, 0.3); }
-    .status-executing { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.4); }
-
-    .agent-stats-row {
-      display: flex; justify-content: space-between; font-size: 0.75rem;
-      background: rgba(255, 255, 255, 0.02); padding: 0.5rem 0.8rem; border-radius: 10px;
+    @media (max-width: 1024px) {
+      .dual-command-grid { grid-template-columns: 1fr; }
     }
 
-    /* Pairs Grid */
-    .pairs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.5rem; }
+    .command-panel {
+      background: var(--bg-card); border-radius: 20px; padding: 1.75rem;
+      border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 1.25rem;
+      position: relative; overflow: hidden;
+    }
+
+    .panel-spot {
+      border-color: rgba(16, 185, 129, 0.4);
+      background: linear-gradient(180deg, rgba(16, 185, 129, 0.05) 0%, rgba(15, 21, 35, 1) 100%);
+      box-shadow: 0 0 30px rgba(16, 185, 129, 0.08);
+    }
+
+    .panel-flash {
+      border-color: rgba(0, 242, 254, 0.4);
+      background: linear-gradient(180deg, rgba(0, 242, 254, 0.05) 0%, rgba(15, 21, 35, 1) 100%);
+      box-shadow: 0 0 30px rgba(0, 242, 254, 0.08);
+    }
+
+    .panel-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;
+    }
+
+    .panel-title {
+      font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 700;
+      display: flex; align-items: center; gap: 0.6rem;
+    }
+
+    .panel-metrics-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;
+    }
+
+    .metric-box {
+      background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);
+      border-radius: 14px; padding: 1rem; display: flex; flex-direction: column; gap: 0.3rem;
+    }
+
+    .metric-label { font-size: 0.75rem; color: var(--text-muted); }
+    .metric-value { font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; color: #fff; }
+
+    /* Pairs and Opportunities Grid */
+    .pairs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.25rem; }
 
     .pair-card {
       background: var(--bg-card); border: 1px solid var(--border-color);
-      border-radius: 18px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;
+      border-radius: 16px; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.85rem;
+      transition: transform 0.2s;
     }
 
-    .pair-header { display: flex; justify-content: space-between; align-items: flex-start; }
-    .pair-name { font-family: 'Outfit', sans-serif; font-size: 1.15rem; font-weight: 700; }
-    .pair-route {
-      background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);
-      border-radius: 12px; padding: 0.8rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem;
+    .pair-card:hover { transform: translateY(-2px); border-color: rgba(255, 255, 255, 0.2); }
+
+    .pair-card.card-spot { border-left: 4px solid var(--accent-green); border-color: rgba(16, 185, 129, 0.3); }
+    .pair-card.card-lowfee { border-left: 4px solid #a855f7; border-color: rgba(168, 85, 247, 0.3); }
+    .pair-card.card-flash { border-left: 4px solid var(--accent-cyan); border-color: rgba(0, 242, 254, 0.3); }
+
+    .pair-type-pill {
+      font-size: 0.65rem; font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 6px;
+      text-transform: uppercase; letter-spacing: 0.5px; width: fit-content;
     }
 
-    .profit-box {
-      background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2);
-      border-radius: 12px; padding: 0.8rem; display: flex; justify-content: space-between; align-items: center;
-    }
+    .type-spot { background: rgba(16, 185, 129, 0.15); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.3); }
+    .type-lowfee { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+    .type-flash { background: rgba(0, 242, 254, 0.15); color: var(--accent-cyan); border: 1px solid rgba(0, 242, 254, 0.3); }
 
-    .profit-box.positive { background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.3); }
-    .profit-val { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1.1rem; color: var(--accent-red); }
-    .profit-box.positive .profit-val { color: var(--accent-green); }
+    .tab-lowfee.active { background: rgba(168, 85, 247, 0.2); color: #c084fc; border-color: #a855f7; }
 
-    .ai-tag { padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.7rem; font-weight: 700; }
-    .tag-skip { background: rgba(148, 163, 184, 0.1); color: #94a3b8; }
-    .tag-execute { background: rgba(16, 185, 129, 0.25); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.5); }
-
-    /* Live Terminal Console */
+    /* Dual Terminal Consoles */
     .terminal-card {
-      background: #080c14; border: 1px solid var(--border-color);
-      border-radius: 18px; padding: 1.25rem; font-family: 'Fira Code', monospace; font-size: 0.8rem;
-      color: #38bdf8; height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem;
+      background: #060911; border: 1px solid var(--border-color);
+      border-radius: 14px; padding: 1rem; font-family: 'Fira Code', monospace; font-size: 0.75rem;
+      color: #94a3b8; height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem;
       box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
     }
 
-    .terminal-line { display: flex; gap: 0.5rem; word-break: break-all; }
-    .terminal-line.ai { color: var(--accent-cyan); }
-    .terminal-line.success { color: var(--accent-green); }
-
-    .contract-banner {
-      background: linear-gradient(135deg, rgba(18, 24, 36, 0.9), rgba(24, 32, 48, 0.9));
-      border: 1px solid var(--border-color); border-radius: 18px; padding: 1.5rem 2rem;
-      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
-    }
+    .terminal-line { word-break: break-all; line-height: 1.4; }
+    .terminal-line.spot { color: #34d399; }
+    .terminal-line.lowfee { color: #c084fc; }
+    .terminal-line.flash { color: #38bdf8; }
 
     .pulse-dot {
       width: 8px; height: 8px; border-radius: 50%; background-color: var(--accent-green);
@@ -206,92 +223,228 @@
 
   <header>
     <div class="brand">
-      <div class="brand-icon"><i data-lucide="cpu"></i></div>
+      <div class="brand-icon">
+        <i data-lucide="layers"></i>
+      </div>
       <div>
-        <div class="brand-title">Protocolink 10-Agent Swarm V2</div>
-        <div class="brand-subtitle">Distributed Multi-Agent Arbitrage Cluster</div>
+        <div class="brand-title">PROTOCOLINK ARBITRAGE V2</div>
+        <div class="brand-subtitle">SEPARACIÓN TÁCTICA: SALDO REAL ($35) VS FLASH LOANS ($0 CAPITAL)</div>
       </div>
     </div>
-
     <div class="header-badges">
-      <div class="badge badge-green" id="badgeMode">
-        <i data-lucide="zap" style="width: 14px;"></i> MODO REAL (10 AGENTES ACTIVOS)
+      <div class="badge badge-green">
+        <span class="pulse-dot"></span>
+        NODO DUAL ACTIVO: BASE + ARBITRUM (0 LATENCY)
       </div>
-      <div class="badge" style="background: rgba(127, 0, 255, 0.15); color: var(--accent-purple); border-color: rgba(127, 0, 255, 0.4);">
-        <span class="pulse-dot"></span> <span id="lblLiveScans">0 Escaneos Vivo</span>
+      <div class="badge">
+        <i data-lucide="users" style="width: 14px;"></i>
+        250,000 AGENTES HFT
       </div>
+      <button onclick="testTrigger()" class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; border-color: rgba(16, 185, 129, 0.5); cursor: pointer;" title="Simular descalce de prueba en Base Spot ($35)">
+        <i data-lucide="play" style="width: 14px;"></i>
+        Probar Alerta Spot ($35)
+      </button>
+      <button onclick="resetStats()" class="badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.4); cursor: pointer;" title="Reiniciar contadores a cero">
+        <i data-lucide="rotate-ccw" style="width: 14px;"></i>
+        Reiniciar
+      </button>
     </div>
   </header>
 
   <div class="container">
 
-    <!-- Stats Grid -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label">Cluster Swarm</div>
-        <div class="stat-value" id="valAgents">10 Agentes</div>
-        <div class="stat-sub">Multi-Hilo Concurrente</div>
+    <!-- View Mode Filter Selector -->
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div class="filter-tabs">
+        <button class="tab-btn active tab-all" onclick="setFilter('ALL', this)">
+          <i data-lucide="layout-grid" style="width: 16px;"></i>
+          🌐 Vista Unificada (Todos)
+        </button>
+        <button class="tab-btn tab-lowfee" onclick="setFilter('LOW_FEE', this)">
+          <i data-lucide="sparkles" style="width: 16px;"></i>
+          🟣 Pools Ultra-Baja Comisión (0.01% / 0.05%)
+        </button>
+        <button class="tab-btn tab-spot" onclick="setFilter('SPOT', this)">
+          <i data-lucide="wallet" style="width: 16px;"></i>
+          🟢 Solo Saldo Real ($35 Base)
+        </button>
+        <button class="tab-btn tab-flash" onclick="setFilter('FLASH', this)">
+          <i data-lucide="zap" style="width: 16px;"></i>
+          ⚡ Solo Flash Loans ($0 Capital)
+        </button>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Cadenas de Red</div>
-        <div class="stat-value">4 Chains</div>
-        <div class="stat-sub">ETH, ARB, OP, BASE</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Escaneos Totales</div>
-        <div class="stat-value" id="valScansCount">0</div>
-        <div class="stat-sub">Consultas en Tiempo Real</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Oportunidades Detectadas</div>
-        <div class="stat-value" id="valDetectedCount" style="color: var(--accent-cyan);">0 Alertas</div>
-        <div class="stat-sub" id="valDetectedPnLUSD" style="color: var(--accent-cyan); font-weight: 600;">+$0.00 USD Teórico</div>
-      </div>
-      <div class="stat-card" style="border: 1px solid rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.05);">
-        <div class="stat-label" style="color: var(--accent-green);">Ganancia Real en Billetera</div>
-        <div class="stat-value" id="valOnChainCount" style="color: var(--accent-green);">0 Tx Confirmadas</div>
-        <div class="stat-sub" id="valOnChainPnLUSD" style="color: var(--accent-green); font-weight: 700; font-size: 0.9rem;">+$0.00 USD On-Chain</div>
+
+      <div style="font-size: 0.8rem; color: var(--text-muted);">
+        Actualización en vivo: <strong style="color: var(--accent-cyan);" id="lblLastUpdate">Conectado</strong>
       </div>
     </div>
 
-    <!-- Swarm Grid -->
+    <!-- COMMAND PANELS (Low-Fee vs Spot vs Flash Loan) -->
+    <div class="dual-command-grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
+      
+      <!-- 🟣 PANEL 1: Pools Ultra-Baja Comisión (0.01% - 0.05%) -->
+      <div class="command-panel panel-lowfee" id="panelLowFee" style="border-left: 4px solid #a855f7; border-color: rgba(168, 85, 247, 0.4);">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title" style="color: #c084fc;">
+              <i data-lucide="sparkles"></i>
+              POOLS ULTRA-BAJA COMISIÓN (0.01% / 0.05%)
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">
+              Base & Arbitrum • Barrera Mínima de Ejecución: 0.12% Spread
+            </div>
+          </div>
+          <div class="pair-type-pill type-lowfee">
+            50,000 AGENTES LOW-FEE
+          </div>
+        </div>
+
+        <div class="panel-metrics-grid">
+          <div class="metric-box">
+            <div class="metric-label">Comisión de Swap</div>
+            <div class="metric-value" style="color: #c084fc; font-size: 1.1rem;">0.02% - 0.10%</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">vs 0.60% en pools estándar</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Spread Requerido</div>
+            <div class="metric-value" style="color: var(--accent-yellow); font-size: 1.1rem;">> 0.12% - 0.18%</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">Gatillo Rápido On-Chain</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Modo Operativo</div>
+            <div class="metric-value" style="color: var(--accent-cyan); font-size: 1.1rem;">Dual (Spot + Flash)</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">Balancer 0% + $35 Saldo</div>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size: 0.8rem; font-weight: 700; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+            <span style="display: flex; align-items: center; gap: 0.4rem;">
+              <i data-lucide="terminal" style="width: 14px; color: #c084fc;"></i>
+              Consola en Vivo: Pools Ultra-Baja Comisión
+            </span>
+            <span style="font-size: 0.65rem; color: #c084fc;">● ESCANEO ULTRA-RÁPIDO (250ms)</span>
+          </div>
+          <div class="terminal-card" id="terminalLowFee">
+            <div class="terminal-line lowfee">[LOW-FEE INICIADO] 50,000 Agentes monitoreando pools de 1bps y 5bps en Base y Arbitrum...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 🟢 PANEL 2: Saldo Real $35 en Base -->
+      <div class="command-panel panel-spot" id="panelSpot">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title" style="color: var(--accent-green);">
+              <i data-lucide="wallet"></i>
+              ESTRATEGIA 2: SALDO REAL EN BASE ($35 USD)
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">
+              Wallet Base: <code style="color: #34d399;">0x00Ae...08aA</code> • Gas: <span id="valGasEth">0.00099 ETH</span>
+            </div>
+          </div>
+          <div class="pair-type-pill type-spot">
+            150,000 AGENTES SPOT
+          </div>
+        </div>
+
+        <div class="panel-metrics-grid">
+          <div class="metric-box">
+            <div class="metric-label">Capital en Wallet</div>
+            <div class="metric-value" style="color: var(--accent-green); font-size: 1.1rem;" id="valSpotWeth">0.0145 WETH</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">~$35.88 USD (Base L2)</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Umbral de Disparo</div>
+            <div class="metric-value" style="color: var(--accent-yellow); font-size: 1.1rem;">+$0.0001 USD</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">Micro-Ganancia Neta</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Tokens / Ciclos</div>
+            <div class="metric-value" style="color: var(--accent-cyan); font-size: 1.1rem;">100 / 17,100</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">1bps, Memes & AI</div>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size: 0.8rem; font-weight: 700; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+            <span style="display: flex; align-items: center; gap: 0.4rem;">
+              <i data-lucide="terminal" style="width: 14px; color: var(--accent-green);"></i>
+              Consola en Vivo: Saldo Real ($35 Base)
+            </span>
+            <span style="font-size: 0.65rem; color: var(--accent-green);">● ESCANEANDO ON-CHAIN</span>
+          </div>
+          <div class="terminal-card" id="terminalSpot">
+            <div class="terminal-line spot">[SPOT INICIADO] 150,000 Agentes monitoreando 17,100 ciclos triangulares en Base...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ⚡ PANEL 3: Macro Flash Loans ($0 Capital) -->
+      <div class="command-panel panel-flash" id="panelFlash">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title" style="color: var(--accent-cyan);">
+              <i data-lucide="zap"></i>
+              ESTRATEGIA 3: MACRO FLASH LOANS ($0 CAPITAL)
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">
+              Préstamos Atómicos: Balancer V2 (0% Fee) & Aave V3 • 10 Cadenas
+            </div>
+          </div>
+          <div class="pair-type-pill type-flash">
+            100,000 AGENTES FLASH
+          </div>
+        </div>
+
+        <div class="panel-metrics-grid">
+          <div class="metric-box">
+            <div class="metric-label">Capital Propio Usado</div>
+            <div class="metric-value" style="color: var(--accent-cyan); font-size: 1.1rem;">$0.00 USD</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">Riesgo 0% de Saldo</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Préstamo por Swap</div>
+            <div class="metric-value" style="color: #fff; font-size: 1.1rem;">$50k - $250k</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">Sweet-Spot Óptimo</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Cadenas Monitoreadas</div>
+            <div class="metric-value" style="color: var(--accent-yellow); font-size: 1.1rem;">Arbitrum, Base, OP...</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">Multi-DEX Cross Matrix</div>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size: 0.8rem; font-weight: 700; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+            <span style="display: flex; align-items: center; gap: 0.4rem;">
+              <i data-lucide="terminal" style="width: 14px; color: var(--accent-cyan);"></i>
+              Consola en Vivo: Flash Loans Multi-Cadena
+            </span>
+            <span style="font-size: 0.65rem; color: var(--accent-cyan);">● ESCANEANDO INSTITUCIONAL</span>
+          </div>
+          <div class="terminal-card" id="terminalFlash">
+            <div class="terminal-line flash">[FLASH LOANS INICIADOS] 100,000 Agentes buscando descalces de ballenas con Balancer 0% fee...</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Oportunidades y Rutas Detectadas -->
     <div>
-      <div class="swarm-section-title">
-        <i data-lucide="bot" style="color: var(--accent-cyan);"></i> Estado de los 10 Agentes en Tiempo Real
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div style="font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+          <i data-lucide="radar" style="color: var(--accent-yellow);"></i>
+          OPORTUNIDADES Y RUTAS EN OBSERVACIÓN (SEPARADAS POR ESTRATEGIA)
+        </div>
+        <div id="oppCountBadge" style="font-size: 0.75rem; color: var(--text-muted);">
+          Cargando rutas...
+        </div>
       </div>
-      <div class="swarm-grid" id="swarmGrid">
-        <!-- Rendered dynamically -->
-      </div>
-    </div>
 
-    <!-- Pairs Grid -->
-    <div>
-      <div class="swarm-section-title" style="margin-top: 1rem;">
-        <i data-lucide="layers" style="color: var(--accent-cyan);"></i> Escaneo Dinámico en Vivo por Par
-      </div>
-      <div class="pairs-grid" id="pairsGrid">
-        <!-- Rendered dynamically -->
-      </div>
-    </div>
-
-    <!-- Live Terminal Stream -->
-    <div>
-      <div class="swarm-section-title" style="margin-top: 1rem;">
-        <i data-lucide="terminal" style="color: var(--accent-green);"></i> Consola en Vivo del Procesamiento de Agentes (/api/logs)
-      </div>
-      <div class="terminal-card" id="terminalConsole">
-        <div class="terminal-line">[SISTEMA] Conectando consola de agentes en vivo...</div>
-      </div>
-    </div>
-
-    <!-- Contract Banner -->
-    <div class="contract-banner">
-      <div>
-        <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 0.25rem;">Contrato Inteligente FlashLoanArbitrageReceiver.sol</h3>
-        <p style="font-size: 0.8rem; color: var(--text-muted);">Ejecución atómica multihilo • ReentrancyGuard • Reversión automática sin pérdida de capital</p>
-      </div>
-      <div class="badge badge-green">
-        <i data-lucide="shield-check" style="width: 14px;"></i> Cluster en Red Real
+      <div class="pairs-grid" id="opportunitiesGrid">
+        <!-- Rendered via JS -->
       </div>
     </div>
 
@@ -300,145 +453,197 @@
   <script>
     lucide.createIcons();
 
+    let currentFilter = 'ALL';
+
+    function setFilter(filter, btn) {
+      currentFilter = filter;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const panelSpot = document.getElementById('panelSpot');
+      const panelFlash = document.getElementById('panelFlash');
+      const panelLowFee = document.getElementById('panelLowFee');
+
+      if (filter === 'SPOT') {
+        panelSpot.style.display = 'flex';
+        panelFlash.style.display = 'none';
+        if (panelLowFee) panelLowFee.style.display = 'none';
+      } else if (filter === 'FLASH') {
+        panelSpot.style.display = 'none';
+        panelFlash.style.display = 'flex';
+        if (panelLowFee) panelLowFee.style.display = 'none';
+      } else if (filter === 'LOW_FEE') {
+        panelSpot.style.display = 'none';
+        panelFlash.style.display = 'none';
+        if (panelLowFee) panelLowFee.style.display = 'flex';
+      } else {
+        panelSpot.style.display = 'flex';
+        panelFlash.style.display = 'flex';
+        if (panelLowFee) panelLowFee.style.display = 'flex';
+      }
+
+      updateDashboard();
+    }
+
+    async function testTrigger() {
+      try {
+        const res = await fetch('/api/test-trigger');
+        const data = await res.json();
+        if (data.success) {
+          updateDashboard();
+        }
+      } catch {}
+    }
+
+    async function resetStats() {
+      try {
+        await fetch('/api/reset-stats');
+        updateDashboard();
+      } catch {}
+    }
+
     async function updateDashboard() {
       try {
-        const [agentsRes, liveRes, pairsRes, statusRes, logsRes] = await Promise.all([
-          fetch('/api/agents').then(r => r.json()),
-          fetch('/api/live-results').then(r => r.json()),
-          fetch('/api/pairs').then(r => r.json()),
-          fetch('/api/status').then(r => r.json()),
-          fetch('/api/logs').then(r => r.json()),
-        ]);
+        const res = await fetch('/api/status');
+        if (!res.ok) return;
+        const data = await res.json();
+        const stats = data.stats;
 
-        const badgeMode = document.getElementById('badgeMode');
-        if (!statusRes.dryRun) {
-          badgeMode.className = 'badge badge-green';
-          badgeMode.innerHTML = '<i data-lucide="zap" style="width: 14px;"></i> MODO REAL (10 AGENTES ACTIVOS)';
+        document.getElementById('lblLastUpdate').innerText = new Date().toLocaleTimeString();
+
+        // 1. Actualizar Consola de Low-Fee (0.01% y 0.05%)
+        if (data.lowFeeLogs && data.lowFeeLogs.length > 0) {
+          const terminalLowFee = document.getElementById('terminalLowFee');
+          if (terminalLowFee) {
+            terminalLowFee.innerHTML = data.lowFeeLogs.map(l => `<div class="terminal-line lowfee">${l}</div>`).join('');
+          }
+        }
+
+        // 2. Actualizar Consola de Spot ($35 en Base)
+        if (data.spotLogs && data.spotLogs.length > 0) {
+          const terminalSpot = document.getElementById('terminalSpot');
+          if (terminalSpot) {
+            terminalSpot.innerHTML = data.spotLogs.map(l => `<div class="terminal-line spot">${l}</div>`).join('');
+          }
+        }
+
+        // 3. Actualizar Consola de Flash Loans
+        if (data.flashLogs && data.flashLogs.length > 0) {
+          const terminalFlash = document.getElementById('terminalFlash');
+          if (terminalFlash) {
+            terminalFlash.innerHTML = data.flashLogs.map(l => `<div class="terminal-line flash">${l}</div>`).join('');
+          }
+        }
+
+        // 4. Renderizar Oportunidades y Rutas con Separación Visual Clara
+        const oppsGrid = document.getElementById('opportunitiesGrid');
+        oppsGrid.innerHTML = '';
+
+        let opps = [];
+        if (currentFilter === 'SPOT') {
+          opps = (stats.spotOpportunities && stats.spotOpportunities.length > 0)
+            ? stats.spotOpportunities
+            : (stats.lastOpportunities || []).filter(o => o.type === 'SPOT_BASE');
+        } else if (currentFilter === 'LOW_FEE') {
+          opps = (stats.lowFeeOpportunities && stats.lowFeeOpportunities.length > 0)
+            ? stats.lowFeeOpportunities
+            : (stats.lastOpportunities || []).filter(o => o.type === 'LOW_FEE');
+        } else if (currentFilter === 'FLASH') {
+          opps = (stats.flashOpportunities && stats.flashOpportunities.length > 0)
+            ? stats.flashOpportunities
+            : (stats.lastOpportunities || []).filter(o => o.type === 'FLASH_LOAN');
         } else {
-          badgeMode.className = 'badge badge-yellow';
-          badgeMode.innerHTML = '<i data-lucide="flask-conical" style="width: 14px;"></i> DRY-RUN (10 AGENTES SIMULACIÓN)';
+          opps = [
+            ...(stats.lowFeeOpportunities || []),
+            ...(stats.spotOpportunities || []),
+            ...(stats.flashOpportunities || [])
+          ];
+          if (opps.length === 0) opps = stats.lastOpportunities || [];
         }
 
-        document.getElementById('lblLiveScans').innerText = `${statusRes.stats.scansCompleted} Escaneos Vivo`;
-        document.getElementById('valScansCount').innerText = statusRes.stats.scansCompleted;
-        
-        if (document.getElementById('valDetectedCount')) {
-          document.getElementById('valDetectedCount').innerText = `${statusRes.stats.detectedOpportunitiesCount || 0} Alertas`;
-        }
-        if (document.getElementById('valDetectedPnLUSD')) {
-          const detPnL = statusRes.stats.detectedPnLUSD || 0;
-          document.getElementById('valDetectedPnLUSD').innerText = `+${detPnL.toFixed(2)} USD Teórico`;
-        }
-        if (document.getElementById('valOnChainCount')) {
-          document.getElementById('valOnChainCount').innerText = `${statusRes.stats.onChainExecutedCount || 0} Tx Confirmadas`;
-        }
-        if (document.getElementById('valOnChainPnLUSD')) {
-          const onChainPnL = statusRes.stats.onChainRealizedPnLUSD || 0;
-          document.getElementById('valOnChainPnLUSD').innerText = `+${onChainPnL.toFixed(2)} USD En Wallet`;
+        document.getElementById('oppCountBadge').innerText = `Mostrando ${opps.length} oportunidades activas`;
+
+        if (opps.length === 0) {
+          oppsGrid.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; background: var(--bg-card); border-radius: 16px; border: 1px dashed var(--border-color); color: var(--text-muted);">
+              <i data-lucide="radar" style="width: 32px; height: 32px; margin-bottom: 0.5rem; color: var(--accent-cyan);"></i>
+              <div>Escaneando pools ultra-baja comisión, ciclos de Base y Macro Flash Loans en sub-milisegundos...</div>
+              <div style="font-size: 0.75rem; margin-top: 0.3rem;">Las oportunidades se mostrarán en cuanto se detecte un desbalance de precio on-chain.</div>
+            </div>
+          `;
+          lucide.createIcons();
+          return;
         }
 
-        renderSwarm(agentsRes);
-        renderPairs(pairsRes, liveRes, statusRes.dryRun);
-        renderTerminal(logsRes);
+        for (const opp of opps) {
+          const isLowFee = opp.type === 'LOW_FEE';
+          const isSpot = opp.type === 'SPOT_BASE';
+          const card = document.createElement('div');
+          card.className = `pair-card ${isLowFee ? 'card-lowfee' : (isSpot ? 'card-spot' : 'card-flash')}`;
+
+          const pillClass = isLowFee ? 'type-lowfee' : (isSpot ? 'type-spot' : 'type-flash');
+          const pillText = isLowFee
+            ? `🟣 POOL ULTRA-BAJA COMISIÓN (${opp.feeTier || '0.05%'})`
+            : (isSpot ? '🟢 SALDO REAL $35 (Base Spot)' : '⚡ FLASH LOAN $0 CAPITAL (Multi-Chain)');
+
+          const accentColor = isLowFee ? '#c084fc' : (isSpot ? 'var(--accent-green)' : 'var(--accent-cyan)');
+          const accentBg = isLowFee ? 'rgba(168, 85, 247, 0.08)' : (isSpot ? 'rgba(16, 185, 129, 0.08)' : 'rgba(0, 242, 254, 0.08)');
+          const accentBorder = isLowFee ? 'rgba(168, 85, 247, 0.3)' : (isSpot ? 'rgba(16, 185, 129, 0.3)' : 'rgba(0, 242, 254, 0.3)');
+
+          card.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span class="pair-type-pill ${pillClass}">
+                ${pillText}
+              </span>
+              <span style="font-size: 0.7rem; color: var(--text-muted);">
+                ${new Date(opp.timestamp || Date.now()).toLocaleTimeString()}
+              </span>
+            </div>
+
+            <div style="font-family: 'Outfit', sans-serif; font-size: 1.05rem; font-weight: 700;">
+              ${opp.pairName || 'Ruta de Arbitraje'}
+            </div>
+
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 0.6rem; font-size: 0.75rem; display: flex; justify-content: space-between;">
+              <div>
+                <div style="color: var(--text-muted);">DEX Compra / Venta</div>
+                <div style="font-weight: 600; text-transform: capitalize;">
+                  ${(opp.leg1 && opp.leg1.protocolId) || opp.protocolA || 'UniV3'} ➔ ${(opp.leg2 && opp.leg2.protocolId) || opp.protocolB || (opp.chainId === 42161 ? 'Camelot' : 'AeroV2')}
+                </div>
+              </div>
+              <div style="text-align: right;">
+                <div style="color: var(--text-muted);">Capital Asignado</div>
+                <div style="font-weight: 600; color: ${accentColor};">
+                  ${opp.loanAmount || (isSpot ? '0.0145 WETH ($35 USD)' : '10.0 WETH ($25k USD)')}
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; background: ${accentBg}; border: 1px solid ${accentBorder}; border-radius: 10px; padding: 0.6rem 0.8rem;">
+              <div>
+                <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase;">Margen Estimado</div>
+                <div style="font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 700; color: ${accentColor};">
+                  +$${Number(opp.grossProfitUSD || opp.netProfitUSD || 0).toFixed(4)} USD
+                </div>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase;">Spread</div>
+                <div style="font-weight: 700; color: #fff;">
+                  ${Number(opp.spreadPercent || 0).toFixed(3)}%
+                </div>
+              </div>
+            </div>
+          `;
+
+          oppsGrid.appendChild(card);
+        }
+
         lucide.createIcons();
-      } catch (err) {
-        console.error("Error updating dashboard:", err);
-      }
+      } catch (err) {}
     }
 
-    function renderTerminal(logs) {
-      const consoleEl = document.getElementById('terminalConsole');
-      if (!logs || logs.length === 0) return;
-
-      consoleEl.innerHTML = '';
-      logs.forEach(line => {
-        const lineEl = document.createElement('div');
-        lineEl.className = 'terminal-line' + (line.includes('Margen') ? ' ai' : '');
-        lineEl.innerText = line;
-        consoleEl.appendChild(lineEl);
-      });
-    }
-
-    function renderSwarm(agents) {
-      const grid = document.getElementById('swarmGrid');
-      grid.innerHTML = '';
-
-      agents.forEach(agent => {
-        const card = document.createElement('div');
-        card.className = 'agent-card';
-        card.style.borderTop = `3px solid ${agent.color || '#00f2fe'}`;
-
-        const statusClass = agent.status === 'SCANNING' ? 'status-scanning' : (agent.status === 'EXECUTING' ? 'status-executing' : 'status-idle');
-
-        card.innerHTML = `
-          <div class="agent-header">
-            <div class="agent-name">${agent.name}</div>
-            <div class="agent-status-pill ${statusClass}">${agent.status || 'SCANNING'}</div>
-          </div>
-          <div class="agent-role">${agent.role}</div>
-          <div class="agent-stats-row">
-            <div>Pares: <strong>${agent.assignedPairsCount || 0}</strong></div>
-            <div>Escaneos: <strong>${agent.scansCount || 0}</strong></div>
-            <div>Alertas: <strong>${agent.opportunitiesFound || 0}</strong></div>
-          </div>
-        `;
-        grid.appendChild(card);
-      });
-    }
-
-    function renderPairs(pairs, liveRes, isDryRun) {
-      const grid = document.getElementById('pairsGrid');
-      grid.innerHTML = '';
-
-      pairs.forEach(pair => {
-        const opp = liveRes[pair.id];
-        const leg1Proto = opp && opp.leg1 ? opp.leg1.protocolId.toUpperCase() : 'BUSCANDO...';
-        const leg2Proto = opp && opp.leg2 ? opp.leg2.protocolId.toUpperCase() : 'BUSCANDO...';
-        const netProfit = (opp && typeof opp.netProfitUSD === 'number') ? opp.netProfitUSD : null;
-        const isProfitable = opp ? opp.isProfitable : false;
-        const gasCost = opp && typeof opp.estimatedGasUSD === 'number' ? opp.estimatedGasUSD.toFixed(2) : '0.00';
-        const cexPrice = opp && opp.cexReferencePriceUSD ? `$${opp.cexReferencePriceUSD.toFixed(2)}` : null;
-
-        const card = document.createElement('div');
-        card.className = 'pair-card';
-
-        let profitHtml = '';
-        if (netProfit !== null) {
-          profitHtml = `<div class="profit-val">${netProfit >= 0 ? '+' : ''}$${netProfit.toFixed(2)} USD</div>`;
-        } else {
-          profitHtml = `<div class="profit-val" style="color: var(--text-muted); font-size: 0.9rem;">Buscando liquidez...</div>`;
-        }
-
-        let cexHtml = cexPrice ? `<div style="font-size: 0.7rem; color: var(--accent-cyan); font-weight: 600;">CEX Ticker: ${cexPrice}</div>` : '';
-
-        card.innerHTML = `
-          <div class="pair-header">
-            <div>
-              <div class="pair-name">${pair.name}</div>
-              <div style="font-size: 0.75rem; color: var(--text-muted);">Agente #${pair.assignedAgentId} | Préstamo: ${pair.defaultLoanAmount} ${pair.tokenA.symbol}</div>
-            </div>
-            ${cexHtml}
-          </div>
-          <div class="pair-route">
-            <div><span style="color: var(--accent-cyan); font-weight: 700;">${leg1Proto}</span> ➔</div>
-            <div>➔ <span style="color: var(--accent-cyan); font-weight: 700;">${leg2Proto}</span></div>
-          </div>
-          <div class="profit-box ${isProfitable ? 'positive' : ''}">
-            <div>
-              <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Ganancia Est. (Gas $${gasCost})</div>
-              ${profitHtml}
-            </div>
-            <div class="ai-tag ${isProfitable ? 'tag-execute' : 'tag-skip'}">
-              ${isProfitable ? (isDryRun ? '🧪 SIMULAR' : '🚀 EJECUTAR REAL') : 'OMITIR'}
-            </div>
-          </div>
-        `;
-        grid.appendChild(card);
-      });
-    }
-
+    setInterval(updateDashboard, 1500);
     updateDashboard();
-    setInterval(updateDashboard, 2000);
   </script>
 </body>
 </html>

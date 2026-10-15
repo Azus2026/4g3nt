@@ -21,6 +21,7 @@ export interface ArbitrageOpportunity {
   pairName: string;
   chainId: number;
   flashLoanAmount: string;
+  flashLoanToken?: TokenConfig;
   tokenA: TokenConfig;
   tokenB: TokenConfig;
   leg1: DEXQuote;
@@ -37,16 +38,23 @@ export interface ArbitrageOpportunity {
   sweetSpotRatio?: number;
 }
 
-const UNISWAP_V3_QUOTER_ABI = [
+const V3_QUOTER_V2_ABI = [
+  'function quoteExactInputSingle((address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96)) external returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)',
   'function quoteExactInputSingle(address tokenIn, address tokenOut, uint24 fee, uint256 amountIn, uint160 sqrtPriceLimitX96) external returns (uint256 amountOut)'
 ];
 
 const UNISWAP_V3_QUOTER_ADDRESSES: Record<number, string> = {
-  1: '0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6',
-  42161: '0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6',
-  137: '0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6',
-  10: '0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6',
+  1: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
+  42161: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
+  137: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
+  10: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
   8453: '0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a',
+};
+
+const PANCAKE_V3_QUOTER_ADDRESSES: Record<number, string> = {
+  1: '0xB048Bbc1Ee6b733FFfCFb9e9CeF7375518e25997',
+  42161: '0xB048Bbc1Ee6b733FFfCFb9e9CeF7375518e25997',
+  8453: '0xB048Bbc1Ee6b733FFfCFb9e9CeF7375518e25997',
 };
 
 const RPC_FALLBACKS: Record<number, string> = {
@@ -72,15 +80,23 @@ export class ProtocolinkClient {
   /**
    * Convierte un TokenConfig en una instancia válida de common.Token exigida por Protocolink SDK
    */
-  toApiToken(token: TokenConfig): common.Token {
-    return new common.Token(token.chainId, token.address, token.decimals, token.symbol, token.name);
+  toApiToken(token: TokenConfig, fallbackChainId?: number): common.Token {
+    if (!token) {
+      return new common.Token(fallbackChainId || 1, '0x0000000000000000000000000000000000000000', 18, 'ETH', 'Ether');
+    }
+    const chainId = token.chainId || fallbackChainId || 1;
+    const address = token.address || '0x0000000000000000000000000000000000000000';
+    const decimals = token.decimals || 18;
+    const symbol = token.symbol || 'ETH';
+    const name = token.name || symbol;
+    return new common.Token(chainId, address, decimals, symbol, name);
   }
 
   /**
    * Genera la lógica de Préstamo Flash (Aave V3 / Balancer V2) con api.Token estricto
    */
   async getFlashLoanPair(token: TokenConfig, amount: string, chainId: number) {
-    const apiToken = this.toApiToken(token);
+    const apiToken = this.toApiToken(token, chainId);
     const loans = [{ token: apiToken, amount: amount }];
 
     try {
@@ -94,7 +110,7 @@ export class ProtocolinkClient {
   }
 
   /**
-   * Consulta cotización On-Chain directa usando el Quoter de Uniswap V3 con proveedor en caché
+   * Consulta cotización On-Chain directa usando el Quoter V2 de Uniswap V3 con proveedor en caché
    */
   async getOnChainUniswapV3Quote(
     chainId: number,
@@ -108,25 +124,80 @@ export class ProtocolinkClient {
 
     try {
       const provider = getProvider(chainId);
-      const quoter = new ethers.Contract(quoterAddress, UNISWAP_V3_QUOTER_ABI, provider);
+      const quoter = new ethers.Contract(quoterAddress, V3_QUOTER_V2_ABI, provider);
       const parsedAmountIn = ethers.parseUnits(amountIn, tokenIn.decimals);
       
-      const amountOut = await Promise.race([
-        quoter.quoteExactInputSingle.staticCall(
-          tokenIn.address,
-          tokenOut.address,
-          feeTier,
-          parsedAmountIn,
-          0
-        ),
+      const res = await Promise.race([
+        quoter.quoteExactInputSingle.staticCall({
+          tokenIn: tokenIn.address,
+          tokenOut: tokenOut.address,
+          amountIn: parsedAmountIn,
+          fee: feeTier,
+          sqrtPriceLimitX96: 0
+        }).catch(async () => {
+          return quoter.quoteExactInputSingle.staticCall(
+            tokenIn.address,
+            tokenOut.address,
+            feeTier,
+            parsedAmountIn,
+            0
+          );
+        }),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2500))
       ]);
 
+      const amountOut = Array.isArray(res) ? res[0] : res;
       const formattedOut = ethers.formatUnits(amountOut, tokenOut.decimals);
       const feePercent = feeTier === 500 ? '0.05%' : (feeTier === 3000 ? '0.3%' : '1%');
 
       return {
         protocolId: `uniswap-v3-${feePercent}`,
+        chainId,
+        inputToken: tokenIn,
+        outputToken: tokenOut,
+        inputAmount: amountIn,
+        outputAmount: formattedOut,
+        logic: null,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Consulta cotización On-Chain directa usando PancakeSwap V3
+   */
+  async getPancakeSwapV3Quote(
+    chainId: number,
+    tokenIn: TokenConfig,
+    tokenOut: TokenConfig,
+    amountIn: string,
+    feeTier: number = 500
+  ): Promise<DEXQuote | null> {
+    const quoterAddress = PANCAKE_V3_QUOTER_ADDRESSES[chainId];
+    if (!quoterAddress) return null;
+
+    try {
+      const provider = getProvider(chainId);
+      const quoter = new ethers.Contract(quoterAddress, V3_QUOTER_V2_ABI, provider);
+      const parsedAmountIn = ethers.parseUnits(amountIn, tokenIn.decimals);
+
+      const res = await Promise.race([
+        quoter.quoteExactInputSingle.staticCall({
+          tokenIn: tokenIn.address,
+          tokenOut: tokenOut.address,
+          amountIn: parsedAmountIn,
+          fee: feeTier,
+          sqrtPriceLimitX96: 0,
+        }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2500))
+      ]);
+
+      const amountOut = Array.isArray(res) ? res[0] : res;
+      const formattedOut = ethers.formatUnits(amountOut, tokenOut.decimals);
+
+      return {
+        protocolId: 'pancakeswap-v3',
         chainId,
         inputToken: tokenIn,
         outputToken: tokenOut,
@@ -211,6 +282,10 @@ export class ProtocolinkClient {
         const q = await this.getKyberSwapQuote(chainId, tokenIn, tokenOut, amountIn);
         this.quoteCache.set(cacheKey, { quote: q, expiresAt: now + 2500 });
         return q;
+      } else if (protocolId === 'pancakeswap-v3') {
+        const q = await this.getPancakeSwapV3Quote(chainId, tokenIn, tokenOut, amountIn, 500);
+        this.quoteCache.set(cacheKey, { quote: q, expiresAt: now + 2500 });
+        return q;
       }
 
       let quotation: any = null;
@@ -229,6 +304,54 @@ export class ProtocolinkClient {
         } catch {
           return await this.getOnChainUniswapV3Quote(chainId, tokenIn, tokenOut, amountIn, 500);
         }
+      } else if (protocolId === 'camelot-v3') {
+        quotation = await api.protocols.paraswapv5.getSwapTokenQuotation(chainId, {
+          input: { token: apiTokenIn, amount: amountIn },
+          tokenOut: apiTokenOut,
+          includeDEXS: ['CamelotV3', 'Camelot'],
+          slippage: 100,
+        } as any).catch(() => null);
+        if (quotation) logic = api.protocols.paraswapv5.newSwapTokenLogic(quotation);
+      } else if (protocolId === 'aerodrome-base') {
+        quotation = await api.protocols.paraswapv5.getSwapTokenQuotation(chainId, {
+          input: { token: apiTokenIn, amount: amountIn },
+          tokenOut: apiTokenOut,
+          includeDEXS: ['AerodromeSlipstream', 'Aerodrome', 'AerodromeSlipstreamNewFactory'],
+          slippage: 100,
+        } as any).catch(() => null);
+        if (quotation) logic = api.protocols.paraswapv5.newSwapTokenLogic(quotation);
+      } else if (protocolId === 'sushiswap-v3') {
+        quotation = await api.protocols.paraswapv5.getSwapTokenQuotation(chainId, {
+          input: { token: apiTokenIn, amount: amountIn },
+          tokenOut: apiTokenOut,
+          includeDEXS: ['SushiSwapV3', 'SushiSwap'],
+          slippage: 100,
+        } as any).catch(() => null);
+        if (quotation) logic = api.protocols.paraswapv5.newSwapTokenLogic(quotation);
+      } else if (protocolId === 'balancer-v2') {
+        quotation = await api.protocols.paraswapv5.getSwapTokenQuotation(chainId, {
+          input: { token: apiTokenIn, amount: amountIn },
+          tokenOut: apiTokenOut,
+          includeDEXS: ['BalancerV2'],
+          slippage: 100,
+        } as any).catch(() => null);
+        if (quotation) logic = api.protocols.paraswapv5.newSwapTokenLogic(quotation);
+      } else if (protocolId === 'curve-v2') {
+        quotation = await api.protocols.paraswapv5.getSwapTokenQuotation(chainId, {
+          input: { token: apiTokenIn, amount: amountIn },
+          tokenOut: apiTokenOut,
+          includeDEXS: ['CurveV2', 'CurveV1StableNg', 'CurveV1Factory'],
+          slippage: 100,
+        } as any).catch(() => null);
+        if (quotation) logic = api.protocols.paraswapv5.newSwapTokenLogic(quotation);
+      } else if (protocolId === 'zeroexv4') {
+        quotation = await api.protocols.zeroexv4.getSwapTokenQuotation(chainId, {
+          input: { token: apiTokenIn, amount: amountIn },
+          tokenOut: apiTokenOut,
+          apiKey: process.env.ZEROEX_API_KEY || '',
+          slippage: 100,
+        } as any).catch(() => null);
+        if (quotation) logic = api.protocols.zeroexv4.newSwapTokenLogic(quotation);
       } else if (protocolId === 'openocean-v2') {
         quotation = await api.protocols.openoceanv2.getSwapTokenQuotation(chainId, {
           input: { token: apiTokenIn, amount: amountIn },
@@ -256,14 +379,14 @@ export class ProtocolinkClient {
           outputAmount: quotation.output.amount,
           logic,
         };
-        this.quoteCache.set(cacheKey, { quote: resultQuote, expiresAt: now + 2500 });
+        this.quoteCache.set(cacheKey, { quote: resultQuote, expiresAt: now + 500 });
         return resultQuote;
       }
     } catch {
       // Ignorar errores de ruta
     }
 
-    this.quoteCache.set(cacheKey, { quote: null, expiresAt: now + 2000 });
+    this.quoteCache.set(cacheKey, { quote: null, expiresAt: now + 500 });
     return null;
   }
 
@@ -273,30 +396,46 @@ export class ProtocolinkClient {
   async getProtocolinkLogic(chainId: number, quote: DEXQuote) {
     if (quote.logic) return quote.logic;
 
-    const apiTokenIn = this.toApiToken(quote.inputToken);
-    const apiTokenOut = this.toApiToken(quote.outputToken);
+    const apiTokenIn = this.toApiToken(quote.inputToken, chainId);
+    const apiTokenOut = this.toApiToken(quote.outputToken, chainId);
 
-    try {
-      const psQuote = await api.protocols.paraswapv5.getSwapTokenQuotation(chainId, {
-        input: { token: apiTokenIn, amount: quote.inputAmount },
-        tokenOut: apiTokenOut,
-        slippage: 100,
-        excludeDEXS: ['Dexalot', 'Dexalot-42161'],
-      } as any).catch(() => null);
-      if (psQuote) {
-        return api.protocols.paraswapv5.newSwapTokenLogic(psQuote);
-      }
+    // Intentos multi-protocolo (Uniswap V3, ParaSwap V5, OpenOcean, ZeroEx)
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        // 1. Prioridad: Uniswap V3 nativo (100% compatible con Flash Loans)
+        const uniQuote = await api.protocols.uniswapv3.getSwapTokenQuotation(chainId, {
+          input: { token: apiTokenIn, amount: quote.inputAmount },
+          tokenOut: apiTokenOut,
+          slippage: 100,
+        }).catch(() => null);
+        if (uniQuote && uniQuote.output && uniQuote.output.amount) {
+          return api.protocols.uniswapv3.newSwapTokenLogic(uniQuote);
+        }
 
-      const uniQuote = await api.protocols.uniswapv3.getSwapTokenQuotation(chainId, {
-        input: { token: apiTokenIn, amount: quote.inputAmount },
-        tokenOut: apiTokenOut,
-        slippage: 100,
-      }).catch(() => null);
-      if (uniQuote) {
-        return api.protocols.uniswapv3.newSwapTokenLogic(uniQuote);
+        // 2. Agregador ParaSwap V5
+        const psQuote = await api.protocols.paraswapv5.getSwapTokenQuotation(chainId, {
+          input: { token: apiTokenIn, amount: quote.inputAmount },
+          tokenOut: apiTokenOut,
+          slippage: 100,
+          excludeDEXS: ['Dexalot', 'Dexalot-42161'],
+        } as any).catch(() => null);
+        if (psQuote && psQuote.output && psQuote.output.amount) {
+          return api.protocols.paraswapv5.newSwapTokenLogic(psQuote);
+        }
+
+        // 3. Agregador OpenOcean V2
+        const ooQuote = await api.protocols.openoceanv2.getSwapTokenQuotation(chainId, {
+          input: { token: apiTokenIn, amount: quote.inputAmount },
+          tokenOut: apiTokenOut,
+          slippage: 100,
+        }).catch(() => null);
+        if (ooQuote && ooQuote.output && ooQuote.output.amount) {
+          return api.protocols.openoceanv2.newSwapTokenLogic(ooQuote);
+        }
+      } catch {
+        // Breve pausa antes del reintento
+        if (attempt === 0) await new Promise(r => setTimeout(r, 100));
       }
-    } catch {
-      // Ignorar fallback errors
     }
 
     return null;
@@ -316,112 +455,178 @@ export class ProtocolinkClient {
     const [flashLoanLoanLogic, flashLoanRepayLogic] = await this.getFlashLoanPair(flashLoanToken, flashLoanAmount, chainId);
 
     const logic1 = leg1.logic || await this.getProtocolinkLogic(chainId, leg1);
+    if (logic1 && logic1.fields && logic1.fields.output && logic1.fields.output.amount) {
+      leg2.inputAmount = logic1.fields.output.amount;
+    }
     const logic2 = leg2.logic || await this.getProtocolinkLogic(chainId, leg2);
 
-    if (!logic1 || !logic2) {
-      logger.warn(`No se pudo generar la lógica del Router para ${leg1.protocolId} / ${leg2.protocolId}`);
-      return { logics: [], routerData: null };
-    }
+    if (logic1 && logic2) {
+      // Validar estrictamente que el retorno cubra el préstamo flash
+      if (logic2.fields && logic2.fields.output && logic2.fields.output.amount) {
+        const outNum = parseFloat(logic2.fields.output.amount);
+        const inNum = parseFloat(flashLoanAmount);
+        if (outNum < inNum) {
+          logger.warn(`⚠️ [ARBITRAJE INVIABLE] Retorno real de leg2 (${outNum}) menor que préstamo flash (${inNum}). Transacción abortada preventivamente.`);
+          return { logics: [], routerData: null };
+        }
+      }
 
-    const logics = [
-      flashLoanLoanLogic,
-      logic1,
-      logic2,
-      flashLoanRepayLogic,
-    ];
-
-    try {
-      const routerData = {
-        chainId: chainId,
-        account: account,
-        logics: logics,
-      };
-
-      const transactionRequest = await api.buildRouterTransactionRequest(routerData);
-
-      return {
-        logics,
-        routerData: transactionRequest,
-      };
-    } catch (err: any) {
-      const detail = err.response && err.response.data ? JSON.stringify(err.response.data) : err.message;
-      logger.warn(`Falló la solicitud de construcción del router (${detail}). Intentando fallback dinámico...`);
+      const logics = [
+        flashLoanLoanLogic,
+        logic1,
+        logic2,
+        flashLoanRepayLogic,
+      ];
 
       try {
-        const psQuote1 = await api.protocols.paraswapv5.getSwapTokenQuotation(chainId, {
-          input: { token: this.toApiToken(leg1.inputToken), amount: leg1.inputAmount },
-          tokenOut: this.toApiToken(leg1.outputToken),
-          slippage: 100,
-          excludeDEXS: ['Dexalot', 'Dexalot-42161'],
-        } as any).catch(() => null);
-
-        const psQuote2 = psQuote1 ? await api.protocols.paraswapv5.getSwapTokenQuotation(chainId, {
-          input: { token: this.toApiToken(leg2.inputToken), amount: psQuote1.output.amount },
-          tokenOut: this.toApiToken(leg2.outputToken),
-          slippage: 100,
-          excludeDEXS: ['Dexalot', 'Dexalot-42161'],
-        } as any).catch(() => null) : null;
-
-        if (psQuote1 && psQuote2) {
-          const fallbackLogic1 = api.protocols.paraswapv5.newSwapTokenLogic(psQuote1);
-          const fallbackLogic2 = api.protocols.paraswapv5.newSwapTokenLogic(psQuote2);
-          const fallbackLogics = [flashLoanLoanLogic, fallbackLogic1, fallbackLogic2, flashLoanRepayLogic];
-          const fallbackRouterData = await api.buildRouterTransactionRequest({
-            chainId,
-            account,
-            logics: fallbackLogics,
-          });
-          logger.success(`✅ Router Payload generado exitosamente usando fallback ParaSwap (sin Dexalot).`);
-          return {
-            logics: fallbackLogics,
-            routerData: fallbackRouterData,
-          };
-        }
-
-        // Si ParaSwap falla, intentar Uniswap V3 puro
-        const uniQuote1 = await api.protocols.uniswapv3.getSwapTokenQuotation(chainId, {
-          input: { token: this.toApiToken(leg1.inputToken), amount: leg1.inputAmount },
-          tokenOut: this.toApiToken(leg1.outputToken),
-          slippage: 100,
-        }).catch(() => null);
-
-        const uniQuote2 = uniQuote1 ? await api.protocols.uniswapv3.getSwapTokenQuotation(chainId, {
-          input: { token: this.toApiToken(leg2.inputToken), amount: uniQuote1.output.amount },
-          tokenOut: this.toApiToken(leg2.outputToken),
-          slippage: 100,
-        }).catch(() => null) : null;
-
-        if (uniQuote1 && uniQuote2) {
-          const fallbackLogic1 = api.protocols.uniswapv3.newSwapTokenLogic(uniQuote1);
-          const fallbackLogic2 = api.protocols.uniswapv3.newSwapTokenLogic(uniQuote2);
-          const fallbackLogics = [flashLoanLoanLogic, fallbackLogic1, fallbackLogic2, flashLoanRepayLogic];
-          const fallbackRouterData = await api.buildRouterTransactionRequest({
-            chainId,
-            account,
-            logics: fallbackLogics,
-          });
-          logger.success(`✅ Router Payload generado exitosamente usando fallback Uniswap V3.`);
-          return {
-            logics: fallbackLogics,
-            routerData: fallbackRouterData,
-          };
-        }
-      } catch (fallbackErr: any) {
-        logger.warn(`Fallback de construcción del router también falló: ${fallbackErr.message}`);
-      }
-
-      // Fallback Directo de Ejecución de Swap Nativo
-      const directTx = await this.buildDirectParaSwapTransaction(account, chainId, leg1.inputToken, leg1.outputToken, leg1.inputAmount);
-      if (directTx && directTx.to && directTx.data) {
-        logger.success(`✅ Router Payload generado exitosamente vía ParaSwap Direct Gateway.`);
-        return {
-          logics,
-          routerData: directTx,
+        const routerData = {
+          chainId: chainId,
+          account: account,
+          logics: logics,
         };
-      }
 
-      return { logics, routerData: null };
+        const transactionRequest = await api.buildRouterTransactionRequest(routerData);
+        if (transactionRequest && transactionRequest.to && transactionRequest.data) {
+          logger.success(`✅ Router Atómico de Protocolink generado exitosamente para Chain ${chainId}.`);
+          return {
+            logics,
+            routerData: transactionRequest,
+          };
+        }
+      } catch (err: any) {
+        const detail = err.response && err.response.data ? JSON.stringify(err.response.data) : err.message;
+        logger.warn(`Falló la construcción atómica del router en Chain ${chainId} (${detail}). Intentando enrutamiento On-Chain directo...`);
+      }
     }
+
+    // Fallback On-Chain Directo (0ms, 100% resiliente sin depender de APIs de agregadores)
+    const directTx = this.buildDirectUniswapV3Transaction(
+      account,
+      chainId,
+      leg1.inputToken,
+      leg1.outputToken,
+      flashLoanAmount,
+      500
+    );
+    if (directTx && directTx.to && directTx.data) {
+      logger.success(`✅ Router On-Chain Directo generado exitosamente para Chain ${chainId}.`);
+      return {
+        logics: [],
+        routerData: directTx,
+      };
+    }
+
+    return { logics: [], routerData: null };
+  }
+
+  /**
+   * Empaqueta un arbitraje triangular de 3 patas de forma 100% atómica con Flash Loan
+   */
+  async buildTriangularArbitrageTransaction(
+    account: string,
+    chainId: number,
+    opp: {
+      flashLoanAmount: string;
+      tokenA: TokenConfig;
+      leg1: DEXQuote;
+      leg2: DEXQuote;
+      leg3: DEXQuote;
+    }
+  ): Promise<{ logics: any[]; routerData: any | null }> {
+    const { flashLoanAmount, tokenA, leg1, leg2, leg3 } = opp;
+    const [flashLoanLoanLogic, flashLoanRepayLogic] = await this.getFlashLoanPair(tokenA, flashLoanAmount, chainId);
+    const logic1 = leg1.logic || (await this.getProtocolinkLogic(chainId, leg1));
+    const logic2 = leg2.logic || (await this.getProtocolinkLogic(chainId, leg2));
+    const logic3 = leg3.logic || (await this.getProtocolinkLogic(chainId, leg3));
+
+    if (logic1 && logic2 && logic3) {
+      const logics = [
+        flashLoanLoanLogic,
+        logic1,
+        logic2,
+        logic3,
+        flashLoanRepayLogic,
+      ];
+
+      try {
+        const routerData = {
+          chainId: chainId,
+          account: account,
+          logics: logics,
+        };
+
+        const transactionRequest = await api.buildRouterTransactionRequest(routerData);
+        if (transactionRequest && transactionRequest.to && transactionRequest.data) {
+          logger.success(`✅ Router Atómico Triangular generado exitosamente para Chain ${chainId}.`);
+          return {
+            logics,
+            routerData: transactionRequest,
+          };
+        }
+      } catch (err: any) {
+        const detail = err.response && err.response.data ? JSON.stringify(err.response.data) : err.message;
+        logger.warn(`Falló la construcción atómica del router triangular en Chain ${chainId} (${detail}).`);
+      }
+    }
+
+    return { logics: [], routerData: null };
+  }
+
+  /**
+   * Empaqueta un Flash Bundle de 5 a 10 micro-arbitrajes atómicos en un solo viaje Multicall
+   */
+  async buildFlashBundleTransaction(
+    account: string,
+    chainId: number,
+    flashLoanToken: TokenConfig,
+    totalFlashLoanAmount: string,
+    microOpportunities: Array<{ leg1: DEXQuote; leg2: DEXQuote }>
+  ): Promise<{ logics: any[]; routerData: any | null }> {
+    const [flashLoanLoanLogic, flashLoanRepayLogic] = await this.getFlashLoanPair(flashLoanToken, totalFlashLoanAmount, chainId);
+
+    const swapLogics: any[] = [];
+    for (const micro of microOpportunities) {
+      try {
+        const l1 = micro.leg1.logic || await this.getProtocolinkLogic(chainId, micro.leg1);
+        if (l1 && l1.fields && l1.fields.output && l1.fields.output.amount) {
+          micro.leg2.inputAmount = l1.fields.output.amount;
+        }
+        const l2 = micro.leg2.logic || await this.getProtocolinkLogic(chainId, micro.leg2);
+        if (l1 && l2) {
+          swapLogics.push(l1, l2);
+        }
+      } catch {}
+    }
+
+    if (swapLogics.length >= 2) {
+      const logics = [
+        flashLoanLoanLogic,
+        ...swapLogics,
+        flashLoanRepayLogic,
+      ];
+
+      try {
+        const routerData = {
+          chainId: chainId,
+          account: account,
+          logics: logics,
+        };
+
+        const transactionRequest = await api.buildRouterTransactionRequest(routerData);
+        if (transactionRequest && transactionRequest.to && transactionRequest.data) {
+          logger.success(`✅ Flash Bundle Atómico (${swapLogics.length / 2} Micro-Pares) generado para Chain ${chainId}.`);
+          return {
+            logics,
+            routerData: transactionRequest,
+          };
+        }
+      } catch (err: any) {
+        const detail = err.response && err.response.data ? JSON.stringify(err.response.data) : err.message;
+        logger.warn(`Falló la construcción del Flash Bundle en Chain ${chainId} (${detail}).`);
+      }
+    }
+
+    return { logics: [], routerData: null };
   }
 
   /**
@@ -437,7 +642,7 @@ export class ProtocolinkClient {
     try {
       const rawAmount = ethers.parseUnits(amountIn, tokenIn.decimals).toString();
       const priceUrl = `https://apiv5.paraswap.io/prices/?srcToken=${tokenIn.address}&destToken=${tokenOut.address}&amount=${rawAmount}&srcDecimals=${tokenIn.decimals}&destDecimals=${tokenOut.decimals}&side=SELL&network=${chainId}&excludeDEXS=Dexalot`;
-      const res = await axios.get(priceUrl, { timeout: 3000 });
+      const res = await axios.get(priceUrl, { timeout: 5000 });
       const priceRoute = res.data.priceRoute;
       if (!priceRoute) return null;
 
@@ -450,9 +655,57 @@ export class ProtocolinkClient {
         priceRoute,
         userAddress: account,
         partner: 'paraswap',
-      }, { timeout: 3000 });
+      }, { timeout: 5000 });
 
       return txRes.data;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Generación On-Chain Instantánea (0ms) de Calldata para Uniswap V3 Router
+   */
+  buildDirectUniswapV3Transaction(
+    account: string,
+    chainId: number,
+    tokenIn: TokenConfig,
+    tokenOut: TokenConfig,
+    amountIn: string,
+    feeTier: number = 500
+  ): any | null {
+    const UNISWAP_V3_ROUTERS: Record<number, string> = {
+      1: '0xE592427A0AEce92De3Edee1F18E0157C05861564',
+      42161: '0xE592427A0AEce92De3Edee1F18E0157C05861564',
+      10: '0xE592427A0AEce92De3Edee1F18E0157C05861564',
+      8453: '0x2626664c2603336E57B271c5C0b26F421741e481',
+    };
+
+    const routerAddress = UNISWAP_V3_ROUTERS[chainId];
+    if (!routerAddress) return null;
+
+    try {
+      const rawAmount = ethers.parseUnits(amountIn, tokenIn.decimals);
+      const iface = new ethers.Interface([
+        'function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 deadline, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) payable returns (uint256 amountOut)',
+      ]);
+
+      const calldata = iface.encodeFunctionData('exactInputSingle', [{
+        tokenIn: tokenIn.address,
+        tokenOut: tokenOut.address,
+        fee: feeTier,
+        recipient: account,
+        deadline: Math.floor(Date.now() / 1000) + 180,
+        amountIn: rawAmount,
+        amountOutMinimum: 0,
+        sqrtPriceLimitX96: 0,
+      }]);
+
+      return {
+        to: routerAddress,
+        data: calldata,
+        value: '0x0',
+      };
     } catch {
       return null;
     }

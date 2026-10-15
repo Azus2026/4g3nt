@@ -6,8 +6,13 @@ import { SwarmManager } from './cluster/swarmManager';
 import { startServer, setSwarmManager } from './server';
 import { logger } from './utils/logger';
 import { telegramNotifier } from './notifications/telegramNotifier';
+import { loadPersistedStats } from './utils/statsStore';
+import { Permit2ApprovalManager } from './executor/permit2ApprovalManager';
 
 async function main() {
+  // Cargar estadísticas históricas desde disco
+  loadPersistedStats();
+
   logger.divider();
   logger.info('🚀 INICIANDO CLUSTER DE 10 AGENTES SWARM DE ARBITRAJE FLASH LOAN V2 (OPTIMIZADO)');
   logger.info(`   Agentes Concurrentes: ${SWARM_AGENTS.length} Agentes Especializados`);
@@ -20,6 +25,27 @@ async function main() {
   // 1. Inicializar Gestor de RPCs y cargar Chainlist.org
   const rpcManager = new RPCManager();
   await rpcManager.loadChainlistRPCs();
+
+  // 2. Garantizar autorizaciones de Uniswap Permit2 y preparar Spot Executor en Base
+  const permit2Manager = new Permit2ApprovalManager(rpcManager);
+  await permit2Manager.ensureAllPermit2Approvals().catch((e) => {
+    logger.warn(`Fallo no-bloqueante en Permit2 approvals: ${e.message}`);
+  });
+
+  const { spotExecutor } = require('./executor/spotExecutor');
+  await spotExecutor.initialize().catch((e: any) => {
+    logger.warn(`Fallo no-bloqueante en Spot Executor: ${e.message}`);
+  });
+
+  const { arbitrumExecutor } = require('./executor/arbitrumExecutor');
+  await arbitrumExecutor.initialize().catch((e: any) => {
+    logger.warn(`Fallo no-bloqueante en Arbitrum Executor: ${e.message}`);
+  });
+
+  const { lowFeeExecutor } = require('./executor/lowFeeExecutor');
+  await lowFeeExecutor.initialize().catch((e: any) => {
+    logger.warn(`Fallo no-bloqueante en Low-Fee Executor: ${e.message}`);
+  });
 
   // Benchmark preliminar para TODAS las cadenas (Ethereum, Arbitrum, Optimism, Polygon, Base, BSC, Avalanche)
   logger.info('Iniciando benchmark de latencia RPC para todas las cadenas soportadas...');

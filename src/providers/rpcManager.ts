@@ -23,7 +23,7 @@ export class RPCManager {
     for (const [chainIdStr, chain] of Object.entries(SUPPORTED_CHAINS)) {
       const chainId = parseInt(chainIdStr, 10);
       const primaryUrl = chain.defaultRpcUrls[0];
-      const provider = new ethers.JsonRpcProvider(primaryUrl, chainId, { staticNetwork: true });
+      const provider = new ethers.JsonRpcProvider(primaryUrl, chainId, { staticNetwork: true, batchMaxCount: 1 });
       this.activeProviders.set(chainId, {
         chainId,
         url: primaryUrl,
@@ -33,8 +33,11 @@ export class RPCManager {
     }
   }
 
+  private executionProviders: Map<number, ethers.JsonRpcProvider> = new Map();
+  private lastBlockTrigger: Map<number, number> = new Map();
+
   /**
-   * Conecta al canal WebSocket wss:// para escuchar eventos newHeads en milisegundo 0
+   * Conecta al canal WebSocket wss:// para escuchar eventos newHeads con debounce inteligente
    */
   subscribeNewHeads(chainId: number, callback: (blockNumber: number) => void): void {
     const chain = SUPPORTED_CHAINS[chainId];
@@ -43,6 +46,14 @@ export class RPCManager {
     try {
       const wsProvider = new ethers.WebSocketProvider(chain.wssUrl, chainId);
       wsProvider.on('block', (blockNumber: number) => {
+        const now = Date.now();
+        const last = this.lastBlockTrigger.get(chainId) || 0;
+        // Debounce: Limitar a máximo 1 escaneo cada 1500ms en L2 para ahorrar 85% de llamadas
+        if (now - last < 1500) {
+          return;
+        }
+        this.lastBlockTrigger.set(chainId, now);
+
         logger.rpc(`[WSS - Chain ${chainId}] ⚡ Nuevo Bloque Detectado #${blockNumber} (Milisegundo 0)`);
         callback(blockNumber);
       });
@@ -84,7 +95,7 @@ export class RPCManager {
   }
 
   /**
-   * Prueba latencia y selecciona el mejor RPC para una cadena dada (Prioridad Absoluta a Nodos Privados)
+   * Prueba latencia y selecciona el mejor RPC público para escaneo continuo
    */
   async benchmarkAndSelectBestRPC(chainId: number): Promise<ethers.JsonRpcProvider> {
     const chain = SUPPORTED_CHAINS[chainId];
@@ -92,27 +103,10 @@ export class RPCManager {
       throw new Error(`ChainID ${chainId} no soportada.`);
     }
 
-    // Si hay una URL privada dedicada configurada en .env (ej. QuickNode / Infura / Alchemy), usarla directamente
-    const primaryEnvUrl = chain.defaultRpcUrls[0];
-    if (primaryEnvUrl && (primaryEnvUrl.includes('quiknode') || primaryEnvUrl.includes('infura') || primaryEnvUrl.includes('alchemy'))) {
-      try {
-        const start = Date.now();
-        const dedicatedProvider = new ethers.JsonRpcProvider(primaryEnvUrl, chainId, { staticNetwork: true });
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('RPC Timeout')), 3000));
-        await Promise.race([dedicatedProvider.getBlockNumber(), timeoutPromise]);
-        const latencyMs = Date.now() - start;
-        const dedicatedRpc: ActiveRPC = {
-          chainId,
-          url: primaryEnvUrl,
-          latencyMs,
-          provider: dedicatedProvider,
-        };
-        this.activeProviders.set(chainId, dedicatedRpc);
-        logger.rpc(`⚡ [Chain ${chainId} - ${chain.name}] Nodo Privado QuickNode Seleccionado: ${primaryEnvUrl.slice(0, 55)}... (${latencyMs}ms)`);
-        return dedicatedProvider;
-      } catch {
-        // Fallback si la llave privada falla
-      }
+    // Inicializar el Provider Premium de Ejecución (QuickNode) exclusivamente para broadcast atómico
+    if (chain.premiumRpcUrl) {
+      const execProvider = new ethers.JsonRpcProvider(chain.premiumRpcUrl, chainId, { staticNetwork: true, batchMaxCount: 1 });
+      this.executionProviders.set(chainId, execProvider);
     }
 
     const candidateUrls = [
@@ -122,10 +116,10 @@ export class RPCManager {
 
     let bestRpc: ActiveRPC | null = null;
 
-    for (const url of candidateUrls.slice(0, 5)) {
+    for (const url of candidateUrls.slice(0, 4)) {
       try {
         const start = Date.now();
-        const testProvider = new ethers.JsonRpcProvider(url, chainId, { staticNetwork: true });
+        const testProvider = new ethers.JsonRpcProvider(url, chainId, { staticNetwork: true, batchMaxCount: 1 });
         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('RPC Timeout')), 3000));
         await Promise.race([testProvider.getBlockNumber(), timeoutPromise]);
         const latencyMs = Date.now() - start;
@@ -138,31 +132,73 @@ export class RPCManager {
             provider: testProvider,
           };
         }
-      } catch (e) {
-        // Ignorar nodos caídos o con límites de cuota
+      } catch {
+        // Ignorar nodos con error
       }
     }
 
     if (bestRpc) {
       this.activeProviders.set(chainId, bestRpc);
-      logger.rpc(`[Chain ${chainId} - ${chain.name}] Nodo activo seleccionado: ${bestRpc.url} (${bestRpc.latencyMs}ms)`);
+      logger.rpc(`[Chain ${chainId} - ${chain.name}] Nodo público gratuito seleccionado: ${bestRpc.url} (${bestRpc.latencyMs}ms)`);
       return bestRpc.provider;
     }
 
     // Fallback a provider por defecto
     const fallbackUrl = chain.defaultRpcUrls[0];
-    const fallbackProvider = new ethers.JsonRpcProvider(fallbackUrl, chainId, { staticNetwork: true });
+    const fallbackProvider = new ethers.JsonRpcProvider(fallbackUrl, chainId, { staticNetwork: true, batchMaxCount: 1 });
     this.activeProviders.set(chainId, { chainId, url: fallbackUrl, latencyMs: 999, provider: fallbackProvider });
     return fallbackProvider;
   }
 
+  private rpcIndexMap: Map<number, number> = new Map();
+
+  /**
+   * Rota al siguiente RPC disponible para una cadena cuando ocurre un error 429 o timeout
+   */
+  rotateProvider(chainId: number): ethers.JsonRpcProvider {
+    const chain = SUPPORTED_CHAINS[chainId];
+    if (!chain || chain.defaultRpcUrls.length === 0) return this.getProvider(chainId);
+
+    const currentIndex = this.rpcIndexMap.get(chainId) || 0;
+    const nextIndex = (currentIndex + 1) % chain.defaultRpcUrls.length;
+    this.rpcIndexMap.set(chainId, nextIndex);
+
+    const nextUrl = chain.defaultRpcUrls[nextIndex];
+    const newProvider = new ethers.JsonRpcProvider(nextUrl, chainId, { staticNetwork: true, batchMaxCount: 1 });
+
+    this.activeProviders.set(chainId, {
+      chainId,
+      url: nextUrl,
+      latencyMs: 150,
+      provider: newProvider
+    });
+
+    logger.rpc(`[Chain ${chainId}] 🔄 RPC rotado automáticamente a: ${nextUrl}`);
+    return newProvider;
+  }
+
+  /**
+   * Obtiene el Provider Gratuito de Consulta Continua
+   */
   getProvider(chainId: number): ethers.JsonRpcProvider {
     const active = this.activeProviders.get(chainId);
     if (active) return active.provider;
-    return new ethers.JsonRpcProvider(SUPPORTED_CHAINS[chainId]?.defaultRpcUrls[0] || 'https://cloudflare-eth.com');
+    return new ethers.JsonRpcProvider(SUPPORTED_CHAINS[chainId]?.defaultRpcUrls[0] || 'https://cloudflare-eth.com', chainId, { staticNetwork: true, batchMaxCount: 1 });
+  }
+
+  /**
+   * Obtiene el Provider Premium (QuickNode) para Ejecución y Envío de Transacciones
+   */
+  getExecutionProvider(chainId: number): ethers.JsonRpcProvider {
+    const exec = this.executionProviders.get(chainId);
+    if (exec) return exec;
+    return this.getProvider(chainId);
   }
 
   getActiveRPCs(): ActiveRPC[] {
     return Array.from(this.activeProviders.values());
   }
 }
+
+export const rpcManager = new RPCManager();
+

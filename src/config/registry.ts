@@ -20,6 +20,7 @@ export interface ArbitragePair {
 
 export interface AgentDefinition {
   id: number;
+  regimentId: number;
   name: string;
   role: string;
   targetChains: number[];
@@ -47,18 +48,73 @@ export const DEX_PROTOCOLS: DEXProtocol[] = [
   { id: 'velora-v2-all', name: 'Velora V2 (Delta & Market)', type: 'aggregator' },
 ];
 
-export const SWARM_AGENTS: AgentDefinition[] = [
-  { id: 1, name: 'Agent-01 (ETH Majors)', role: 'Ethereum Core High-Liquidity Arbitrage', targetChains: [1], color: '#3b82f6' },
-  { id: 2, name: 'Agent-02 (ETH Altcoins)', role: 'Ethereum DeFi & Governance Tokens', targetChains: [1], color: '#8b5cf6' },
-  { id: 3, name: 'Agent-03 (Arbitrum Alpha)', role: 'Arbitrum One High-Volume WETH/USDC/ARB', targetChains: [42161], color: '#06b6d4' },
-  { id: 4, name: 'Agent-04 (Arbitrum Ecosystem)', role: 'Arbitrum Camelot & DeFi Token Spreads', targetChains: [42161], color: '#a855f7' },
-  { id: 5, name: 'Agent-05 (Optimism Swarm)', role: 'Optimism Velodrome & Synthetix Spreads', targetChains: [10], color: '#f43f5e' },
-  { id: 6, name: 'Agent-06 (Base Aerodrome)', role: 'Base Aerodrome High-Liquidity Swarm', targetChains: [8453], color: '#eab308' },
-  { id: 7, name: 'Agent-07 (Base Meme & Volatility)', role: 'Base Trending Meme & AI High Volatility', targetChains: [8453], color: '#10b981' },
-  { id: 8, name: 'Agent-08 (LST & Restaking)', role: 'Liquid Staking (stETH/ezETH/weETH) De-pegs', targetChains: [1, 42161, 8453], color: '#ec4899' },
-  { id: 9, name: 'Agent-09 (Cross-L2 Arbitrage)', role: 'Arbitrum vs Optimism vs Base Cross-Spread', targetChains: [42161, 10, 8453], color: '#f97316' },
-  { id: 10, name: 'Agent-10 (Stablecoin Pegs)', role: 'USDC / USDT / DAI De-peg Arbitrage', targetChains: [1, 42161, 10, 8453], color: '#14b8a6' },
+export const TOTAL_AGENTS_COUNT = 250000;
+export const TOTAL_REGIMENTS_COUNT = 2500;
+export const TOTAL_LEGIONS_COUNT = 250;
+
+export const REGIMENTS_METADATA = [
+  { name: 'Base AI & SocialFi Legions', chain: [8453], color: '#00f2fe', role: 'Base Trending AI Agents & Social Tokens' },
+  { name: 'Base Meme Volatility & Snipers', chain: [8453], color: '#10b981', role: 'Base Aerodrome Meme High Volatility' },
+  { name: 'Base Aerodrome Slipstream', chain: [8453], color: '#eab308', role: 'Base Core Slipstream High-Liquidity' },
+  { name: 'Arbitrum Camelot V3 Alphas', chain: [42161], color: '#06b6d4', role: 'Arbitrum Camelot V3 Native Alphas' },
+  { name: 'Arbitrum Uniswap & Balancer', chain: [42161], color: '#3b82f6', role: 'Arbitrum Bluechips & DeFi Majors' },
+  { name: 'BNB Chain PancakeSwap & Thena', chain: [56], color: '#f3ba2f', role: 'BSC High-Volume Retail & Meme Matrix' },
+  { name: 'Polygon PoS QuickSwap & Retro', chain: [137], color: '#8247e5', role: 'Polygon Sub-Cent Fast Micro-Arb' },
+  { name: 'Avalanche Trader Joe Liquidity Book', chain: [43114], color: '#e84142', role: 'Avalanche Zero-Slippage Discrete Bins' },
+  { name: 'Blast Native Yield & Thruster', chain: [81457], color: '#fcfe00', role: 'Blast High-Volatility Points & Yield' },
+  { name: 'Linea & Scroll ZK-Rollups', chain: [59144, 534352], color: '#00d2d3', role: 'ZK-Rollup Low-Competition Snipers' },
+  { name: 'ETH Stablecoin Depeg Hunters', chain: [1], color: '#14b8a6', role: 'Ethereum Curve/Ethena Stable De-peg' },
+  { name: 'ETH Liquid Restaking & LST', chain: [1], color: '#ec4899', role: 'Ethereum LRT/LST Yield Arbitrage' },
+  { name: 'ETH Curve & Balancer Mega', chain: [1], color: '#8b5cf6', role: 'Ethereum Mainnet Multi-Asset Pools' },
+  { name: 'Optimism Velodrome & Synthetix', chain: [10], color: '#f43f5e', role: 'Optimism Velodrome Slipstream Swarm' },
+  { name: 'CoW Swap Batch Auction Solvers', chain: [1, 42161, 8453], color: '#ff793f', role: 'CoW Protocol Batch Solver Surplus' },
+  { name: 'Perp-DEX vs Spot Basis Snipers', chain: [42161, 8453, 10], color: '#ffa502', role: 'GMX/Vertex/Hyperliquid Funding Basis' },
+  { name: 'NHop Polygonal Graph Cycles (4-6 Hops)', chain: [8453, 42161, 1, 56, 137, 43114], color: '#ff4757', role: 'Polygonal Graph Long-Path Cyclic Arb' },
+  { name: 'Atomic Lending Flash Liquidations', chain: [8453, 42161, 1, 56, 137, 43114], color: '#2ed573', role: 'Aave/Compound/Moonwell Under-Collateral Liquidation' },
+  { name: 'Sub-Cent L2 High-Freq Micro-Snipers ($0.001)', chain: [8453, 42161, 137, 81457, 59144, 534352], color: '#26de81', role: 'Sub-Cent 1-5bps Micro-Spread Capture' },
+  { name: 'Atomic Flash-Bundle Multi-DEX Amortizers', chain: [8453, 42161, 56, 137, 43114], color: '#a55eea', role: 'Atomic Multi-Swap Flash-Bundle Amortizer' },
+  { name: 'Sub-Gwei Tick-Exact Yul Lens Snipers', chain: [8453, 42161, 1, 10], color: '#fed330', role: 'Yul Storage Slots Zero-Slippage Micro-Arb' },
+  { name: 'CEX-DEX Lag Anticipation Snipers', chain: [8453, 42161, 1, 10, 56, 137, 43114], color: '#f093fb', role: 'Binance/Bybit/Coinbase CEX-to-DEX Lag' },
+  { name: 'Triangular Multi-Hop High-Freq', chain: [8453, 42161, 1, 10, 56, 137, 43114], color: '#ffd166', role: 'Triangular 3-Hop Multi-DEX Micro-Arb' },
 ];
+
+export function getAgentByIndex(id: number): AgentDefinition {
+  const regimentIndex = Math.floor((id - 1) / 100) % REGIMENTS_METADATA.length;
+  const regimentId = Math.floor((id - 1) / 100) + 1;
+  const meta = REGIMENTS_METADATA[regimentIndex];
+  const paddedId = id.toString().padStart(6, '0');
+
+  return {
+    id,
+    regimentId,
+    name: `Agent-${paddedId} (R${regimentId})`,
+    role: `${meta.role} #${((id - 1) % 100) + 1}`,
+    targetChains: meta.chain,
+    color: meta.color,
+  };
+}
+
+export function getRegimentAgents(regimentId: number): AgentDefinition[] {
+  const list: AgentDefinition[] = [];
+  const startId = (regimentId - 1) * 100 + 1;
+  const endId = Math.min(regimentId * 100, TOTAL_AGENTS_COUNT);
+  for (let i = startId; i <= endId; i++) {
+    list.push(getAgentByIndex(i));
+  }
+  return list;
+}
+
+export function generate250000SwarmAgents(): AgentDefinition[] {
+  const agents: AgentDefinition[] = [];
+  // Precargar una muestra representativa en memoria
+  for (let i = 1; i <= 2500; i++) {
+    agents.push(getAgentByIndex(i));
+  }
+  return agents;
+}
+
+export const SWARM_AGENTS: AgentDefinition[] = generate250000SwarmAgents();
+
 
 export const TOKENS: Record<string, TokenConfig> = {
   // 🟢 Ethereum Mainnet (Chain 1)
@@ -77,6 +133,10 @@ export const TOKENS: Record<string, TokenConfig> = {
   LDO_ETH:    { chainId: 1, address: '0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32', decimals: 18, symbol: 'LDO', name: 'Lido DAO' },
   PENDLE_ETH: { chainId: 1, address: '0x808507121B80c02388fAd14726482e061B8da827', decimals: 18, symbol: 'PENDLE', name: 'Pendle' },
   ENA_ETH:    { chainId: 1, address: '0x57e114B691db790C35207b2e685D4A43181e664D', decimals: 18, symbol: 'ENA', name: 'Ethena' },
+  USDE_ETH:   { chainId: 1, address: '0x4c9EDD5852cd905f086C759E8383e09bff1E68B3', decimals: 18, symbol: 'USDe', name: 'Ethena USDe' },
+  CRVUSD_ETH: { chainId: 1, address: '0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E', decimals: 18, symbol: 'crvUSD', name: 'Curve USD' },
+  GHO_ETH:    { chainId: 1, address: '0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f', decimals: 18, symbol: 'GHO', name: 'Aave GHO' },
+  FRAX_ETH:   { chainId: 1, address: '0x853d955aCEf822Db058eb8505911ED77F175b99e', decimals: 18, symbol: 'FRAX', name: 'Frax' },
   STETH_ETH:  { chainId: 1, address: '0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84', decimals: 18, symbol: 'stETH', name: 'Liquid Staked Ether' },
   WSTETH_ETH: { chainId: 1, address: '0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0', decimals: 18, symbol: 'wstETH', name: 'Wrapped stETH' },
   RETH_ETH:   { chainId: 1, address: '0xae78736Cd615f374D3085123A210448E74Fc6393', decimals: 18, symbol: 'rETH', name: 'Rocket Pool ETH' },
@@ -135,118 +195,174 @@ export const TOKENS: Record<string, TokenConfig> = {
   WBTC_BASE:    { chainId: 8453, address: '0x0555E30da8f98308EdB960aa94C0Db47230d2B9c', decimals: 8, symbol: 'WBTC', name: 'Wrapped BTC' },
   WSTETH_BASE:  { chainId: 8453, address: '0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452', decimals: 18, symbol: 'wstETH', name: 'Wrapped stETH' },
   WEETH_BASE:   { chainId: 8453, address: '0x04C0599Ae5A44757c0af6F9eC3b93da8976c150A', decimals: 18, symbol: 'weETH', name: 'Wrapped eETH' },
+  // 🟡 BNB Chain (BSC - Chain 56)
+  WBNB_BSC:   { chainId: 56, address: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c', decimals: 18, symbol: 'WBNB', name: 'Wrapped BNB' },
+  USDT_BSC:   { chainId: 56, address: '0x55d398326f99059fF775485246999027B3197955', decimals: 18, symbol: 'USDT', name: 'Tether USD' },
+  USDC_BSC:   { chainId: 56, address: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', decimals: 18, symbol: 'USDC', name: 'USD Coin' },
+  CAKE_BSC:   { chainId: 56, address: '0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82', decimals: 18, symbol: 'CAKE', name: 'PancakeSwap' },
+  BTCB_BSC:   { chainId: 56, address: '0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c', decimals: 18, symbol: 'BTCB', name: 'Bitcoin BEP20' },
+  ETH_BSC:    { chainId: 56, address: '0x2170Ed0880ac9A755fd29B2688956BD959F933F8', decimals: 18, symbol: 'ETH', name: 'Ethereum BEP20' },
+
+  // 💜 Polygon PoS (Chain 137)
+  POL_POLY:   { chainId: 137, address: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270', decimals: 18, symbol: 'POL', name: 'Polygon Ecosystem Token' },
+  USDC_POLY:  { chainId: 137, address: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359', decimals: 6, symbol: 'USDC', name: 'USD Coin' },
+  USDT_POLY:  { chainId: 137, address: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F', decimals: 6, symbol: 'USDT', name: 'Tether USD' },
+  WETH_POLY:  { chainId: 137, address: '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619', decimals: 18, symbol: 'WETH', name: 'Wrapped Ether' },
+  QUICK_POLY: { chainId: 137, address: '0xB5C064F955D8e7F38fE0460C556a72987494eE17', decimals: 18, symbol: 'QUICK', name: 'QuickSwap' },
+
+  // 🔺 Avalanche C-Chain (Chain 43114)
+  WAVAX_AVAX: { chainId: 43114, address: '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7', decimals: 18, symbol: 'WAVAX', name: 'Wrapped AVAX' },
+  USDC_AVAX:  { chainId: 43114, address: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E', decimals: 6, symbol: 'USDC', name: 'USD Coin' },
+  USDT_AVAX:  { chainId: 43114, address: '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7', decimals: 6, symbol: 'USDT', name: 'Tether USD' },
+  WETH_AVAX:  { chainId: 43114, address: '0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB', decimals: 18, symbol: 'WETH', name: 'Wrapped Ether' },
+  JOE_AVAX:   { chainId: 43114, address: '0x6e84a6216eA6dACC71eE8E6b0a5B7322EEbC0fDd', decimals: 18, symbol: 'JOE', name: 'Trader Joe' },
+
+  // 💥 Blast (Chain 81457)
+  WETH_BLAST:  { chainId: 81457, address: '0x4300000000000000000000000000000000000004', decimals: 18, symbol: 'WETH', name: 'Wrapped Ether' },
+  USDB_BLAST:  { chainId: 81457, address: '0x4300000000000000000000000000000000000003', decimals: 18, symbol: 'USDB', name: 'Blast USDB' },
+  BLAST_BLAST: { chainId: 81457, address: '0xb1a5700fA2301CDa54887346A22B278452388447', decimals: 18, symbol: 'BLAST', name: 'Blast Token' },
+
+  // 🦊 Linea (Chain 59144)
+  WETH_LINEA:  { chainId: 59144, address: '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f', decimals: 18, symbol: 'WETH', name: 'Wrapped Ether' },
+  USDC_LINEA:  { chainId: 59144, address: '0x176211869cA2b568f2A7D4EE941E073a821EE1ff', decimals: 6, symbol: 'USDC', name: 'USD Coin' },
+  FOXY_LINEA:  { chainId: 59144, address: '0x5FBDF89403270a1846F5ae7D113A989F850d1566', decimals: 18, symbol: 'FOXY', name: 'Foxy' },
+
+  // 📜 Scroll (Chain 534352)
+  WETH_SCROLL: { chainId: 534352, address: '0x5300000000000000000000000000000000000004', decimals: 18, symbol: 'WETH', name: 'Wrapped Ether' },
+  USDC_SCROLL: { chainId: 534352, address: '0x06eFdBF5e0263E9025a2f148967EC564574e37C6', decimals: 6, symbol: 'USDC', name: 'USD Coin' },
+  SCR_SCROLL:  { chainId: 534352, address: '0xd29687c813D741E2F938F4aC377128810E217b1b', decimals: 18, symbol: 'SCR', name: 'Scroll' },
 };
 
 export const MULTI_CHAIN_ARBITRAGE_PAIRS: ArbitragePair[] = [
-  // 🟢 Agent 1: Ethereum Majors (10 Pares)
-  { id: 'ETH-WETH-USDC', name: 'WETH / USDC (Mainnet)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.USDC_ETH, defaultLoanAmount: '10', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 1 },
-  { id: 'ETH-WETH-USDT', name: 'WETH / USDT (Mainnet)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.USDT_ETH, defaultLoanAmount: '10', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 1 },
-  { id: 'ETH-WETH-DAI',  name: 'WETH / DAI (Mainnet)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.DAI_ETH, defaultLoanAmount: '10', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 1 },
-  { id: 'ETH-WBTC-WETH', name: 'WBTC / WETH (Mainnet)', chainId: 1, tokenA: TOKENS.WBTC_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '0.5', approxPriceUSD: 65000, cexSymbol: 'BTCUSDT', assignedAgentId: 1 },
-  { id: 'ETH-WBTC-USDC', name: 'WBTC / USDC (Mainnet)', chainId: 1, tokenA: TOKENS.WBTC_ETH, tokenB: TOKENS.USDC_ETH, defaultLoanAmount: '0.5', approxPriceUSD: 65000, cexSymbol: 'BTCUSDT', assignedAgentId: 1 },
-  { id: 'ETH-WBTC-USDT', name: 'WBTC / USDT (Mainnet)', chainId: 1, tokenA: TOKENS.WBTC_ETH, tokenB: TOKENS.USDT_ETH, defaultLoanAmount: '0.5', approxPriceUSD: 65000, cexSymbol: 'BTCUSDT', assignedAgentId: 1 },
-  { id: 'ETH-USDC-DAI',  name: 'USDC / DAI (Mainnet)', chainId: 1, tokenA: TOKENS.USDC_ETH, tokenB: TOKENS.DAI_ETH, defaultLoanAmount: '5000', approxPriceUSD: 1, assignedAgentId: 1 },
-  { id: 'ETH-USDT-DAI',  name: 'USDT / DAI (Mainnet)', chainId: 1, tokenA: TOKENS.USDT_ETH, tokenB: TOKENS.DAI_ETH, defaultLoanAmount: '5000', approxPriceUSD: 1, assignedAgentId: 1 },
-  { id: 'ETH-WETH-WBTC', name: 'WETH / WBTC (Mainnet Inverse)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.WBTC_ETH, defaultLoanAmount: '10', approxPriceUSD: 3000, cexSymbol: 'ETHBTC', assignedAgentId: 1 },
-  { id: 'ETH-USDC-WETH', name: 'USDC / WETH (Mainnet Stable-In)', chainId: 1, tokenA: TOKENS.USDC_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '15000', approxPriceUSD: 1, cexSymbol: 'ETHUSDT', assignedAgentId: 1 },
+  // 🟢 Agent 1: Ethereum Majors & Synthetics (14 Pares)
+  { id: 'ETH-WETH-USDC',   name: 'WETH / USDC (Mainnet)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.USDC_ETH, defaultLoanAmount: '10', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 1 },
+  { id: 'ETH-WETH-USDT',   name: 'WETH / USDT (Mainnet)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.USDT_ETH, defaultLoanAmount: '10', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 1 },
+  { id: 'ETH-WETH-DAI',    name: 'WETH / DAI (Mainnet)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.DAI_ETH, defaultLoanAmount: '10', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 1 },
+  { id: 'ETH-WBTC-WETH',   name: 'WBTC / WETH (Mainnet)', chainId: 1, tokenA: TOKENS.WBTC_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '0.5', approxPriceUSD: 65000, cexSymbol: 'BTCUSDT', assignedAgentId: 1 },
+  { id: 'ETH-WBTC-USDC',   name: 'WBTC / USDC (Mainnet)', chainId: 1, tokenA: TOKENS.WBTC_ETH, tokenB: TOKENS.USDC_ETH, defaultLoanAmount: '0.5', approxPriceUSD: 65000, cexSymbol: 'BTCUSDT', assignedAgentId: 1 },
+  { id: 'ETH-WBTC-USDT',   name: 'WBTC / USDT (Mainnet)', chainId: 1, tokenA: TOKENS.WBTC_ETH, tokenB: TOKENS.USDT_ETH, defaultLoanAmount: '0.5', approxPriceUSD: 65000, cexSymbol: 'BTCUSDT', assignedAgentId: 1 },
+  { id: 'ETH-USDC-DAI',    name: 'USDC / DAI (Mainnet)', chainId: 1, tokenA: TOKENS.USDC_ETH, tokenB: TOKENS.DAI_ETH, defaultLoanAmount: '5000', approxPriceUSD: 1, assignedAgentId: 1 },
+  { id: 'ETH-USDT-DAI',    name: 'USDT / DAI (Mainnet)', chainId: 1, tokenA: TOKENS.USDT_ETH, tokenB: TOKENS.DAI_ETH, defaultLoanAmount: '5000', approxPriceUSD: 1, assignedAgentId: 1 },
+  { id: 'ETH-WETH-WBTC',   name: 'WETH / WBTC (Mainnet Inverse)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.WBTC_ETH, defaultLoanAmount: '10', approxPriceUSD: 3000, cexSymbol: 'ETHBTC', assignedAgentId: 1 },
+  { id: 'ETH-USDC-WETH',   name: 'USDC / WETH (Mainnet Stable-In)', chainId: 1, tokenA: TOKENS.USDC_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '15000', approxPriceUSD: 1, cexSymbol: 'ETHUSDT', assignedAgentId: 1 },
+  { id: 'ETH-WETH-USDE',   name: 'WETH / USDe (Ethena Mainnet)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.USDE_ETH, defaultLoanAmount: '10', approxPriceUSD: 3000, assignedAgentId: 1 },
+  { id: 'ETH-USDC-USDE',   name: 'USDC / USDe (Ethena Stable)', chainId: 1, tokenA: TOKENS.USDC_ETH, tokenB: TOKENS.USDE_ETH, defaultLoanAmount: '10000', approxPriceUSD: 1, assignedAgentId: 1 },
+  { id: 'ETH-USDC-CRVUSD', name: 'USDC / crvUSD (Curve Mainnet)', chainId: 1, tokenA: TOKENS.USDC_ETH, tokenB: TOKENS.CRVUSD_ETH, defaultLoanAmount: '10000', approxPriceUSD: 1, assignedAgentId: 1 },
+  { id: 'ETH-USDC-GHO',    name: 'USDC / GHO (Aave Mainnet)', chainId: 1, tokenA: TOKENS.USDC_ETH, tokenB: TOKENS.GHO_ETH, defaultLoanAmount: '10000', approxPriceUSD: 1, assignedAgentId: 1 },
 
   // 🟣 Agent 2: Ethereum Altcoins & DeFi (12 Pares)
-  { id: 'ETH-LINK-WETH',   name: 'LINK / WETH (Mainnet)', chainId: 1, tokenA: TOKENS.LINK_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '500', approxPriceUSD: 16, cexSymbol: 'LINKUSDT', assignedAgentId: 2 },
-  { id: 'ETH-LINK-USDC',   name: 'LINK / USDC (Mainnet)', chainId: 1, tokenA: TOKENS.LINK_ETH, tokenB: TOKENS.USDC_ETH, defaultLoanAmount: '500', approxPriceUSD: 16, cexSymbol: 'LINKUSDT', assignedAgentId: 2 },
-  { id: 'ETH-UNI-WETH',    name: 'UNI / WETH (Mainnet)', chainId: 1, tokenA: TOKENS.UNI_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '1000', approxPriceUSD: 8, cexSymbol: 'UNIUSDT', assignedAgentId: 2 },
-  { id: 'ETH-UNI-USDC',    name: 'UNI / USDC (Mainnet)', chainId: 1, tokenA: TOKENS.UNI_ETH, tokenB: TOKENS.USDC_ETH, defaultLoanAmount: '1000', approxPriceUSD: 8, cexSymbol: 'UNIUSDT', assignedAgentId: 2 },
-  { id: 'ETH-AAVE-WETH',   name: 'AAVE / WETH (Mainnet)', chainId: 1, tokenA: TOKENS.AAVE_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '50', approxPriceUSD: 90, cexSymbol: 'AAVEUSDT', assignedAgentId: 2 },
-  { id: 'ETH-MKR-WETH',    name: 'MKR / WETH (Mainnet)', chainId: 1, tokenA: TOKENS.MKR_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '2', approxPriceUSD: 2500, cexSymbol: 'MKRUSDT', assignedAgentId: 2 },
-  { id: 'ETH-PEPE-WETH',   name: 'PEPE / WETH (Mainnet)', chainId: 1, tokenA: TOKENS.PEPE_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '500000000', approxPriceUSD: 0.000008, cexSymbol: 'PEPEUSDT', assignedAgentId: 2 },
-  { id: 'ETH-SHIB-WETH',   name: 'SHIB / WETH (Mainnet)', chainId: 1, tokenA: TOKENS.SHIB_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '300000000', approxPriceUSD: 0.000015, cexSymbol: 'SHIBUSDT', assignedAgentId: 2 },
-  { id: 'ETH-CRV-WETH',    name: 'CRV / WETH (Mainnet)', chainId: 1, tokenA: TOKENS.CRV_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '5000', approxPriceUSD: 0.35, cexSymbol: 'CRVUSDT', assignedAgentId: 2 },
-  { id: 'ETH-LDO-WETH',    name: 'LDO / WETH (Mainnet)', chainId: 1, tokenA: TOKENS.LDO_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '2000', approxPriceUSD: 1.2, cexSymbol: 'LDOUSDT', assignedAgentId: 2 },
-  { id: 'ETH-PENDLE-WETH', name: 'PENDLE / WETH (Mainnet)', chainId: 1, tokenA: TOKENS.PENDLE_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '1000', approxPriceUSD: 5, cexSymbol: 'PENDLEUSDT', assignedAgentId: 2 },
-  { id: 'ETH-ENA-WETH',    name: 'ENA / WETH (Mainnet)', chainId: 1, tokenA: TOKENS.ENA_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '4000', approxPriceUSD: 0.6, cexSymbol: 'ENAUSDT', assignedAgentId: 2 },
+  { id: 'ETH-WETH-LINK',   name: 'WETH / LINK (Mainnet)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.LINK_ETH, defaultLoanAmount: '5', approxPriceUSD: 3000, cexSymbol: 'LINKUSDT', assignedAgentId: 2 },
+  { id: 'ETH-USDC-LINK',   name: 'USDC / LINK (Mainnet)', chainId: 1, tokenA: TOKENS.USDC_ETH, tokenB: TOKENS.LINK_ETH, defaultLoanAmount: '10000', approxPriceUSD: 1, cexSymbol: 'LINKUSDT', assignedAgentId: 2 },
+  { id: 'ETH-WETH-UNI',    name: 'WETH / UNI (Mainnet)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.UNI_ETH, defaultLoanAmount: '5', approxPriceUSD: 3000, cexSymbol: 'UNIUSDT', assignedAgentId: 2 },
+  { id: 'ETH-USDC-UNI',    name: 'USDC / UNI (Mainnet)', chainId: 1, tokenA: TOKENS.USDC_ETH, tokenB: TOKENS.UNI_ETH, defaultLoanAmount: '10000', approxPriceUSD: 1, cexSymbol: 'UNIUSDT', assignedAgentId: 2 },
+  { id: 'ETH-WETH-AAVE',   name: 'WETH / AAVE (Mainnet)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.AAVE_ETH, defaultLoanAmount: '5', approxPriceUSD: 3000, cexSymbol: 'AAVEUSDT', assignedAgentId: 2 },
+  { id: 'ETH-WETH-MKR',    name: 'WETH / MKR (Mainnet)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.MKR_ETH, defaultLoanAmount: '5', approxPriceUSD: 3000, cexSymbol: 'MKRUSDT', assignedAgentId: 2 },
+  { id: 'ETH-WETH-PEPE',   name: 'WETH / PEPE (Mainnet)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.PEPE_ETH, defaultLoanAmount: '5', approxPriceUSD: 3000, cexSymbol: 'PEPEUSDT', assignedAgentId: 2 },
+  { id: 'ETH-WETH-SHIB',   name: 'WETH / SHIB (Mainnet)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.SHIB_ETH, defaultLoanAmount: '5', approxPriceUSD: 3000, cexSymbol: 'SHIBUSDT', assignedAgentId: 2 },
+  { id: 'ETH-WETH-CRV',    name: 'WETH / CRV (Mainnet)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.CRV_ETH, defaultLoanAmount: '5', approxPriceUSD: 3000, cexSymbol: 'CRVUSDT', assignedAgentId: 2 },
+  { id: 'ETH-WETH-LDO',    name: 'WETH / LDO (Mainnet)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.LDO_ETH, defaultLoanAmount: '5', approxPriceUSD: 3000, cexSymbol: 'LDOUSDT', assignedAgentId: 2 },
+  { id: 'ETH-WETH-PENDLE', name: 'WETH / PENDLE (Mainnet)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.PENDLE_ETH, defaultLoanAmount: '5', approxPriceUSD: 3000, cexSymbol: 'PENDLEUSDT', assignedAgentId: 2 },
+  { id: 'ETH-WETH-ENA',    name: 'WETH / ENA (Mainnet)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.ENA_ETH, defaultLoanAmount: '5', approxPriceUSD: 3000, cexSymbol: 'ENAUSDT', assignedAgentId: 2 },
 
   // 🔵 Agent 3: Arbitrum Alpha (12 Pares)
   { id: 'ARB-WETH-USDC',  name: 'WETH / USDC (Arbitrum)', chainId: 42161, tokenA: TOKENS.WETH_ARB, tokenB: TOKENS.USDC_ARB, defaultLoanAmount: '5', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 3 },
   { id: 'ARB-WETH-USDCE', name: 'WETH / USDC.e (Arbitrum Bridged)', chainId: 42161, tokenA: TOKENS.WETH_ARB, tokenB: TOKENS.USDCE_ARB, defaultLoanAmount: '5', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 3 },
   { id: 'ARB-WETH-USDT',  name: 'WETH / USDT (Arbitrum)', chainId: 42161, tokenA: TOKENS.WETH_ARB, tokenB: TOKENS.USDT_ARB, defaultLoanAmount: '5', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 3 },
   { id: 'ARB-WETH-DAI',   name: 'WETH / DAI (Arbitrum)', chainId: 42161, tokenA: TOKENS.WETH_ARB, tokenB: TOKENS.DAI_ARB, defaultLoanAmount: '5', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 3 },
-  { id: 'ARB-ARB-WETH',   name: 'ARB / WETH (Arbitrum)', chainId: 42161, tokenA: TOKENS.ARB_ARB, tokenB: TOKENS.WETH_ARB, defaultLoanAmount: '5000', approxPriceUSD: 0.6, cexSymbol: 'ARBUSDT', assignedAgentId: 3 },
-  { id: 'ARB-ARB-USDC',   name: 'ARB / USDC (Arbitrum)', chainId: 42161, tokenA: TOKENS.ARB_ARB, tokenB: TOKENS.USDC_ARB, defaultLoanAmount: '5000', approxPriceUSD: 0.6, cexSymbol: 'ARBUSDT', assignedAgentId: 3 },
-  { id: 'ARB-ARB-USDT',   name: 'ARB / USDT (Arbitrum)', chainId: 42161, tokenA: TOKENS.ARB_ARB, tokenB: TOKENS.USDT_ARB, defaultLoanAmount: '5000', approxPriceUSD: 0.6, cexSymbol: 'ARBUSDT', assignedAgentId: 3 },
+  { id: 'ARB-WETH-ARB',   name: 'WETH / ARB (Arbitrum)', chainId: 42161, tokenA: TOKENS.WETH_ARB, tokenB: TOKENS.ARB_ARB, defaultLoanAmount: '5', approxPriceUSD: 3000, cexSymbol: 'ARBUSDT', assignedAgentId: 3 },
+  { id: 'ARB-USDC-ARB',   name: 'USDC / ARB (Arbitrum)', chainId: 42161, tokenA: TOKENS.USDC_ARB, tokenB: TOKENS.ARB_ARB, defaultLoanAmount: '5000', approxPriceUSD: 1, cexSymbol: 'ARBUSDT', assignedAgentId: 3 },
+  { id: 'ARB-USDT-ARB',   name: 'USDT / ARB (Arbitrum)', chainId: 42161, tokenA: TOKENS.USDT_ARB, tokenB: TOKENS.ARB_ARB, defaultLoanAmount: '5000', approxPriceUSD: 1, cexSymbol: 'ARBUSDT', assignedAgentId: 3 },
   { id: 'ARB-WBTC-WETH',  name: 'WBTC / WETH (Arbitrum)', chainId: 42161, tokenA: TOKENS.WBTC_ARB, tokenB: TOKENS.WETH_ARB, defaultLoanAmount: '0.2', approxPriceUSD: 65000, cexSymbol: 'BTCUSDT', assignedAgentId: 3 },
   { id: 'ARB-WBTC-USDC',  name: 'WBTC / USDC (Arbitrum)', chainId: 42161, tokenA: TOKENS.WBTC_ARB, tokenB: TOKENS.USDC_ARB, defaultLoanAmount: '0.2', approxPriceUSD: 65000, cexSymbol: 'BTCUSDT', assignedAgentId: 3 },
   { id: 'ARB-USDC-USDCE', name: 'USDC / USDC.e (Arbitrum Peg)', chainId: 42161, tokenA: TOKENS.USDC_ARB, tokenB: TOKENS.USDCE_ARB, defaultLoanAmount: '2000', approxPriceUSD: 1, assignedAgentId: 3 },
   { id: 'ARB-USDC-USDT',  name: 'USDC / USDT (Arbitrum Peg)', chainId: 42161, tokenA: TOKENS.USDC_ARB, tokenB: TOKENS.USDT_ARB, defaultLoanAmount: '2000', approxPriceUSD: 1, assignedAgentId: 3 },
   { id: 'ARB-USDC-WETH',  name: 'USDC / WETH (Arbitrum Stable-In)', chainId: 42161, tokenA: TOKENS.USDC_ARB, tokenB: TOKENS.WETH_ARB, defaultLoanAmount: '10000', approxPriceUSD: 1, cexSymbol: 'ETHUSDT', assignedAgentId: 3 },
 
-  // 🩵 Agent 4: Arbitrum Camelot & DeFi Token Spreads (10 Pares)
-  { id: 'ARB-GMX-WETH',    name: 'GMX / WETH (Camelot DEX)', chainId: 42161, tokenA: TOKENS.GMX_ARB, tokenB: TOKENS.WETH_ARB, defaultLoanAmount: '100', approxPriceUSD: 28, cexSymbol: 'GMXUSDT', assignedAgentId: 4 },
-  { id: 'ARB-GMX-USDC',    name: 'GMX / USDC (Arbitrum)', chainId: 42161, tokenA: TOKENS.GMX_ARB, tokenB: TOKENS.USDC_ARB, defaultLoanAmount: '100', approxPriceUSD: 28, cexSymbol: 'GMXUSDT', assignedAgentId: 4 },
-  { id: 'ARB-GRAIL-WETH',  name: 'GRAIL / WETH (Camelot)', chainId: 42161, tokenA: TOKENS.GRAIL_ARB, tokenB: TOKENS.WETH_ARB, defaultLoanAmount: '2', approxPriceUSD: 1200, assignedAgentId: 4 },
-  { id: 'ARB-PENDLE-WETH', name: 'PENDLE / WETH (Arbitrum)', chainId: 42161, tokenA: TOKENS.PENDLE_ARB, tokenB: TOKENS.WETH_ARB, defaultLoanAmount: '1000', approxPriceUSD: 5, cexSymbol: 'PENDLEUSDT', assignedAgentId: 4 },
-  { id: 'ARB-PENDLE-USDC', name: 'PENDLE / USDC (Arbitrum)', chainId: 42161, tokenA: TOKENS.PENDLE_ARB, tokenB: TOKENS.USDC_ARB, defaultLoanAmount: '1000', approxPriceUSD: 5, cexSymbol: 'PENDLEUSDT', assignedAgentId: 4 },
-  { id: 'ARB-MAGIC-WETH',  name: 'MAGIC / WETH (Arbitrum)', chainId: 42161, tokenA: TOKENS.MAGIC_ARB, tokenB: TOKENS.WETH_ARB, defaultLoanAmount: '2000', approxPriceUSD: 0.4, assignedAgentId: 4 },
-  { id: 'ARB-RDNT-WETH',   name: 'RDNT / WETH (Radiant Arb)', chainId: 42161, tokenA: TOKENS.RDNT_ARB, tokenB: TOKENS.WETH_ARB, defaultLoanAmount: '5000', approxPriceUSD: 0.08, assignedAgentId: 4 },
-  { id: 'ARB-STG-WETH',    name: 'STG / WETH (Stargate Arb)', chainId: 42161, tokenA: TOKENS.STG_ARB, tokenB: TOKENS.WETH_ARB, defaultLoanAmount: '3000', approxPriceUSD: 0.3, assignedAgentId: 4 },
-  { id: 'ARB-LINK-WETH',   name: 'LINK / WETH (Arbitrum)', chainId: 42161, tokenA: TOKENS.LINK_ARB, tokenB: TOKENS.WETH_ARB, defaultLoanAmount: '400', approxPriceUSD: 16, cexSymbol: 'LINKUSDT', assignedAgentId: 4 },
-  { id: 'ARB-UNI-WETH',    name: 'UNI / WETH (Arbitrum)', chainId: 42161, tokenA: TOKENS.UNI_ARB, tokenB: TOKENS.WETH_ARB, defaultLoanAmount: '600', approxPriceUSD: 8, cexSymbol: 'UNIUSDT', assignedAgentId: 4 },
+  // 🩵 Agent 4: Arbitrum Camelot & DeFi Token Spreads (15 Pares)
+  { id: 'ARB-WETH-GMX',         name: 'WETH / GMX (Camelot DEX)', chainId: 42161, tokenA: TOKENS.WETH_ARB, tokenB: TOKENS.GMX_ARB, defaultLoanAmount: '3', approxPriceUSD: 3000, cexSymbol: 'GMXUSDT', assignedAgentId: 4 },
+  { id: 'ARB-USDC-GMX',         name: 'USDC / GMX (Arbitrum)', chainId: 42161, tokenA: TOKENS.USDC_ARB, tokenB: TOKENS.GMX_ARB, defaultLoanAmount: '5000', approxPriceUSD: 1, cexSymbol: 'GMXUSDT', assignedAgentId: 4 },
+  { id: 'ARB-WETH-GRAIL',       name: 'WETH / GRAIL (Camelot)', chainId: 42161, tokenA: TOKENS.WETH_ARB, tokenB: TOKENS.GRAIL_ARB, defaultLoanAmount: '3', approxPriceUSD: 3000, assignedAgentId: 4 },
+  { id: 'ARB-WETH-PENDLE',      name: 'WETH / PENDLE (Arbitrum)', chainId: 42161, tokenA: TOKENS.WETH_ARB, tokenB: TOKENS.PENDLE_ARB, defaultLoanAmount: '3', approxPriceUSD: 3000, cexSymbol: 'PENDLEUSDT', assignedAgentId: 4 },
+  { id: 'ARB-USDC-PENDLE',      name: 'USDC / PENDLE (Arbitrum)', chainId: 42161, tokenA: TOKENS.USDC_ARB, tokenB: TOKENS.PENDLE_ARB, defaultLoanAmount: '5000', approxPriceUSD: 1, cexSymbol: 'PENDLEUSDT', assignedAgentId: 4 },
+  { id: 'ARB-WETH-MAGIC',       name: 'WETH / MAGIC (Arbitrum)', chainId: 42161, tokenA: TOKENS.WETH_ARB, tokenB: TOKENS.MAGIC_ARB, defaultLoanAmount: '3', approxPriceUSD: 3000, assignedAgentId: 4 },
+  { id: 'ARB-WETH-RDNT',        name: 'WETH / RDNT (Radiant Arb)', chainId: 42161, tokenA: TOKENS.WETH_ARB, tokenB: TOKENS.RDNT_ARB, defaultLoanAmount: '3', approxPriceUSD: 3000, assignedAgentId: 4 },
+  { id: 'ARB-WETH-STG',         name: 'WETH / STG (Stargate Arb)', chainId: 42161, tokenA: TOKENS.WETH_ARB, tokenB: TOKENS.STG_ARB, defaultLoanAmount: '3', approxPriceUSD: 3000, assignedAgentId: 4 },
+  { id: 'ARB-WETH-LINK',        name: 'WETH / LINK (Arbitrum)', chainId: 42161, tokenA: TOKENS.WETH_ARB, tokenB: TOKENS.LINK_ARB, defaultLoanAmount: '3', approxPriceUSD: 3000, cexSymbol: 'LINKUSDT', assignedAgentId: 4 },
+  { id: 'ARB-WETH-UNI',         name: 'WETH / UNI (Arbitrum)', chainId: 42161, tokenA: TOKENS.WETH_ARB, tokenB: TOKENS.UNI_ARB, defaultLoanAmount: '3', approxPriceUSD: 3000, cexSymbol: 'UNIUSDT', assignedAgentId: 4 },
+  { id: 'ARB-WETH-PENDLE-CAM',  name: 'WETH / PENDLE (Camelot Native)', chainId: 42161, tokenA: TOKENS.WETH_ARB, tokenB: TOKENS.PENDLE_ARB, defaultLoanAmount: '5', approxPriceUSD: 3000, cexSymbol: 'PENDLEUSDT', assignedAgentId: 4 },
+  { id: 'ARB-USDC-PENDLE-CAM',  name: 'USDC / PENDLE (Camelot Native)', chainId: 42161, tokenA: TOKENS.USDC_ARB, tokenB: TOKENS.PENDLE_ARB, defaultLoanAmount: '10000', approxPriceUSD: 1, cexSymbol: 'PENDLEUSDT', assignedAgentId: 4 },
+  { id: 'ARB-WETH-GMX-CAM',     name: 'WETH / GMX (Camelot Alpha)', chainId: 42161, tokenA: TOKENS.WETH_ARB, tokenB: TOKENS.GMX_ARB, defaultLoanAmount: '5', approxPriceUSD: 3000, cexSymbol: 'GMXUSDT', assignedAgentId: 4 },
+  { id: 'ARB-USDC-GMX-CAM',     name: 'USDC / GMX (Camelot Alpha)', chainId: 42161, tokenA: TOKENS.USDC_ARB, tokenB: TOKENS.GMX_ARB, defaultLoanAmount: '10000', approxPriceUSD: 1, cexSymbol: 'GMXUSDT', assignedAgentId: 4 },
+  { id: 'ARB-WETH-GRAIL-CAM',   name: 'WETH / GRAIL (Camelot Alpha)', chainId: 42161, tokenA: TOKENS.WETH_ARB, tokenB: TOKENS.GRAIL_ARB, defaultLoanAmount: '5', approxPriceUSD: 3000, assignedAgentId: 4 },
 
   // 🔴 Agent 5: Optimism Swarm (10 Pares)
   { id: 'OP-WETH-USDC',  name: 'WETH / USDC (Optimism)', chainId: 10, tokenA: TOKENS.WETH_OP, tokenB: TOKENS.USDC_OP, defaultLoanAmount: '3', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 5 },
   { id: 'OP-WETH-USDCE', name: 'WETH / USDC.e (Optimism Bridged)', chainId: 10, tokenA: TOKENS.WETH_OP, tokenB: TOKENS.USDCE_OP, defaultLoanAmount: '3', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 5 },
   { id: 'OP-WETH-USDT',  name: 'WETH / USDT (Optimism)', chainId: 10, tokenA: TOKENS.WETH_OP, tokenB: TOKENS.USDT_OP, defaultLoanAmount: '3', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 5 },
   { id: 'OP-WETH-DAI',   name: 'WETH / DAI (Optimism)', chainId: 10, tokenA: TOKENS.WETH_OP, tokenB: TOKENS.DAI_OP, defaultLoanAmount: '3', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 5 },
-  { id: 'OP-OP-WETH',    name: 'OP / WETH (Optimism)', chainId: 10, tokenA: TOKENS.OP_OP, tokenB: TOKENS.WETH_OP, defaultLoanAmount: '2000', approxPriceUSD: 1.5, cexSymbol: 'OPUSDT', assignedAgentId: 5 },
-  { id: 'OP-OP-USDC',    name: 'OP / USDC (Optimism)', chainId: 10, tokenA: TOKENS.OP_OP, tokenB: TOKENS.USDC_OP, defaultLoanAmount: '2000', approxPriceUSD: 1.5, cexSymbol: 'OPUSDT', assignedAgentId: 5 },
-  { id: 'OP-SNX-WETH',   name: 'SNX / WETH (Optimism)', chainId: 10, tokenA: TOKENS.SNX_OP, tokenB: TOKENS.WETH_OP, defaultLoanAmount: '1000', approxPriceUSD: 2, assignedAgentId: 5 },
-  { id: 'OP-VELO-WETH',  name: 'VELO / WETH (Velodrome)', chainId: 10, tokenA: TOKENS.VELO_OP, tokenB: TOKENS.WETH_OP, defaultLoanAmount: '5000', approxPriceUSD: 0.1, assignedAgentId: 5 },
-  { id: 'OP-LINK-WETH',  name: 'LINK / WETH (Optimism)', chainId: 10, tokenA: TOKENS.LINK_OP, tokenB: TOKENS.WETH_OP, defaultLoanAmount: '300', approxPriceUSD: 16, cexSymbol: 'LINKUSDT', assignedAgentId: 5 },
+  { id: 'OP-WETH-OP',    name: 'WETH / OP (Optimism)', chainId: 10, tokenA: TOKENS.WETH_OP, tokenB: TOKENS.OP_OP, defaultLoanAmount: '3', approxPriceUSD: 3000, cexSymbol: 'OPUSDT', assignedAgentId: 5 },
+  { id: 'OP-USDC-OP',    name: 'USDC / OP (Optimism)', chainId: 10, tokenA: TOKENS.USDC_OP, tokenB: TOKENS.OP_OP, defaultLoanAmount: '5000', approxPriceUSD: 1, cexSymbol: 'OPUSDT', assignedAgentId: 5 },
+  { id: 'OP-WETH-SNX',   name: 'WETH / SNX (Optimism)', chainId: 10, tokenA: TOKENS.WETH_OP, tokenB: TOKENS.SNX_OP, defaultLoanAmount: '3', approxPriceUSD: 3000, assignedAgentId: 5 },
+  { id: 'OP-WETH-VELO',  name: 'WETH / VELO (Velodrome)', chainId: 10, tokenA: TOKENS.WETH_OP, tokenB: TOKENS.VELO_OP, defaultLoanAmount: '3', approxPriceUSD: 3000, assignedAgentId: 5 },
+  { id: 'OP-WETH-LINK',  name: 'WETH / LINK (Optimism)', chainId: 10, tokenA: TOKENS.WETH_OP, tokenB: TOKENS.LINK_OP, defaultLoanAmount: '3', approxPriceUSD: 3000, cexSymbol: 'LINKUSDT', assignedAgentId: 5 },
   { id: 'OP-WBTC-WETH',  name: 'WBTC / WETH (Optimism)', chainId: 10, tokenA: TOKENS.WBTC_OP, tokenB: TOKENS.WETH_OP, defaultLoanAmount: '0.1', approxPriceUSD: 65000, cexSymbol: 'BTCUSDT', assignedAgentId: 5 },
 
-  // 🟡 Agent 6: Base Aerodrome High-Liquidity Swarm (10 Pares)
-  { id: 'BASE-WETH-USDC',  name: 'WETH / USDC (Base Aerodrome)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.USDC_BASE, defaultLoanAmount: '3', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 6 },
-  { id: 'BASE-WETH-USDBC', name: 'WETH / USDbC (Base Bridged)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.USDBC_BASE, defaultLoanAmount: '3', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 6 },
-  { id: 'BASE-WETH-USDT',  name: 'WETH / USDT (Base)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.USDT_BASE, defaultLoanAmount: '3', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 6 },
-  { id: 'BASE-WETH-DAI',   name: 'WETH / DAI (Base)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.DAI_BASE, defaultLoanAmount: '3', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 6 },
-  { id: 'BASE-AERO-WETH',  name: 'AERO / WETH (Base Aerodrome)', chainId: 8453, tokenA: TOKENS.AERO_BASE, tokenB: TOKENS.WETH_BASE, defaultLoanAmount: '2500', approxPriceUSD: 1.2, assignedAgentId: 6 },
-  { id: 'BASE-AERO-USDC',  name: 'AERO / USDC (Base)', chainId: 8453, tokenA: TOKENS.AERO_BASE, tokenB: TOKENS.USDC_BASE, defaultLoanAmount: '2500', approxPriceUSD: 1.2, assignedAgentId: 6 },
-  { id: 'BASE-CBBTC-WETH', name: 'cbBTC / WETH (Coinbase Base)', chainId: 8453, tokenA: TOKENS.CBBTC_BASE, tokenB: TOKENS.WETH_BASE, defaultLoanAmount: '0.2', approxPriceUSD: 65000, cexSymbol: 'BTCUSDT', assignedAgentId: 6 },
-  { id: 'BASE-CBBTC-USDC', name: 'cbBTC / USDC (Base)', chainId: 8453, tokenA: TOKENS.CBBTC_BASE, tokenB: TOKENS.USDC_BASE, defaultLoanAmount: '0.2', approxPriceUSD: 65000, cexSymbol: 'BTCUSDT', assignedAgentId: 6 },
-  { id: 'BASE-WBTC-WETH',  name: 'WBTC / WETH (Base)', chainId: 8453, tokenA: TOKENS.WBTC_BASE, tokenB: TOKENS.WETH_BASE, defaultLoanAmount: '0.2', approxPriceUSD: 65000, cexSymbol: 'BTCUSDT', assignedAgentId: 6 },
-  { id: 'BASE-USDC-USDBC', name: 'USDC / USDbC (Base Stable Peg)', chainId: 8453, tokenA: TOKENS.USDC_BASE, tokenB: TOKENS.USDBC_BASE, defaultLoanAmount: '2000', approxPriceUSD: 1, assignedAgentId: 6 },
+  // 🟡 Agent 6: Base Aerodrome High-Liquidity Swarm (14 Pares)
+  { id: 'BASE-WETH-USDC',        name: 'WETH / USDC (Base Aerodrome)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.USDC_BASE, defaultLoanAmount: '3', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 6 },
+  { id: 'BASE-WETH-USDBC',       name: 'WETH / USDbC (Base Bridged)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.USDBC_BASE, defaultLoanAmount: '3', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 6 },
+  { id: 'BASE-WETH-USDT',        name: 'WETH / USDT (Base)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.USDT_BASE, defaultLoanAmount: '3', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 6 },
+  { id: 'BASE-WETH-DAI',         name: 'WETH / DAI (Base)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.DAI_BASE, defaultLoanAmount: '3', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 6 },
+  { id: 'BASE-WETH-AERO',        name: 'WETH / AERO (Base Aerodrome)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.AERO_BASE, defaultLoanAmount: '3', approxPriceUSD: 3000, assignedAgentId: 6 },
+  { id: 'BASE-USDC-AERO',        name: 'USDC / AERO (Base)', chainId: 8453, tokenA: TOKENS.USDC_BASE, tokenB: TOKENS.AERO_BASE, defaultLoanAmount: '5000', approxPriceUSD: 1, assignedAgentId: 6 },
+  { id: 'BASE-CBBTC-WETH',       name: 'cbBTC / WETH (Coinbase Base)', chainId: 8453, tokenA: TOKENS.CBBTC_BASE, tokenB: TOKENS.WETH_BASE, defaultLoanAmount: '0.2', approxPriceUSD: 65000, cexSymbol: 'BTCUSDT', assignedAgentId: 6 },
+  { id: 'BASE-CBBTC-USDC',       name: 'cbBTC / USDC (Base)', chainId: 8453, tokenA: TOKENS.CBBTC_BASE, tokenB: TOKENS.USDC_BASE, defaultLoanAmount: '0.2', approxPriceUSD: 65000, cexSymbol: 'BTCUSDT', assignedAgentId: 6 },
+  { id: 'BASE-WBTC-WETH',        name: 'WBTC / WETH (Base)', chainId: 8453, tokenA: TOKENS.WBTC_BASE, tokenB: TOKENS.WETH_BASE, defaultLoanAmount: '0.2', approxPriceUSD: 65000, cexSymbol: 'BTCUSDT', assignedAgentId: 6 },
+  { id: 'BASE-USDC-USDBC',       name: 'USDC / USDbC (Base Stable Peg)', chainId: 8453, tokenA: TOKENS.USDC_BASE, tokenB: TOKENS.USDBC_BASE, defaultLoanAmount: '2000', approxPriceUSD: 1, assignedAgentId: 6 },
+  { id: 'BASE-CBBTC-USDC-AERO',  name: 'cbBTC / USDC (Aerodrome Slipstream)', chainId: 8453, tokenA: TOKENS.CBBTC_BASE, tokenB: TOKENS.USDC_BASE, defaultLoanAmount: '0.5', approxPriceUSD: 65000, cexSymbol: 'BTCUSDT', assignedAgentId: 6 },
+  { id: 'BASE-CBBTC-WETH-AERO',  name: 'cbBTC / WETH (Aerodrome Slipstream)', chainId: 8453, tokenA: TOKENS.CBBTC_BASE, tokenB: TOKENS.WETH_BASE, defaultLoanAmount: '0.5', approxPriceUSD: 65000, cexSymbol: 'BTCUSDT', assignedAgentId: 6 },
+  { id: 'BASE-WETH-AERO-AERO',   name: 'WETH / AERO (Aerodrome Slipstream)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.AERO_BASE, defaultLoanAmount: '5', approxPriceUSD: 3000, assignedAgentId: 6 },
+  { id: 'BASE-USDC-AERO-AERO',   name: 'USDC / AERO (Aerodrome Slipstream)', chainId: 8453, tokenA: TOKENS.USDC_BASE, tokenB: TOKENS.AERO_BASE, defaultLoanAmount: '10000', approxPriceUSD: 1, assignedAgentId: 6 },
 
-  // 🟢 Agent 7: Base Meme & AI Volatility Tokens (10 Pares)
-  { id: 'BASE-BRETT-WETH',   name: 'BRETT / WETH (Base Meme)', chainId: 8453, tokenA: TOKENS.BRETT_BASE, tokenB: TOKENS.WETH_BASE, defaultLoanAmount: '10000', approxPriceUSD: 0.08, assignedAgentId: 7 },
-  { id: 'BASE-BRETT-USDC',   name: 'BRETT / USDC (Base)', chainId: 8453, tokenA: TOKENS.BRETT_BASE, tokenB: TOKENS.USDC_BASE, defaultLoanAmount: '10000', approxPriceUSD: 0.08, assignedAgentId: 7 },
-  { id: 'BASE-DEGEN-WETH',   name: 'DEGEN / WETH (Base Meme)', chainId: 8453, tokenA: TOKENS.DEGEN_BASE, tokenB: TOKENS.WETH_BASE, defaultLoanAmount: '50000', approxPriceUSD: 0.01, assignedAgentId: 7 },
-  { id: 'BASE-DEGEN-USDC',   name: 'DEGEN / USDC (Base)', chainId: 8453, tokenA: TOKENS.DEGEN_BASE, tokenB: TOKENS.USDC_BASE, defaultLoanAmount: '50000', approxPriceUSD: 0.01, assignedAgentId: 7 },
-  { id: 'BASE-VIRTUAL-WETH', name: 'VIRTUAL / WETH (Base AI)', chainId: 8453, tokenA: TOKENS.VIRTUAL_BASE, tokenB: TOKENS.WETH_BASE, defaultLoanAmount: '1000', approxPriceUSD: 1.5, assignedAgentId: 7 },
-  { id: 'BASE-VIRTUAL-USDC', name: 'VIRTUAL / USDC (Base AI)', chainId: 8453, tokenA: TOKENS.VIRTUAL_BASE, tokenB: TOKENS.USDC_BASE, defaultLoanAmount: '1000', approxPriceUSD: 1.5, assignedAgentId: 7 },
-  { id: 'BASE-TOSHI-WETH',   name: 'TOSHI / WETH (Base Meme)', chainId: 8453, tokenA: TOKENS.TOSHI_BASE, tokenB: TOKENS.WETH_BASE, defaultLoanAmount: '5000000', approxPriceUSD: 0.0003, assignedAgentId: 7 },
-  { id: 'BASE-HIGHER-WETH',  name: 'HIGHER / WETH (Base)', chainId: 8453, tokenA: TOKENS.HIGHER_BASE, tokenB: TOKENS.WETH_BASE, defaultLoanAmount: '25000', approxPriceUSD: 0.03, assignedAgentId: 7 },
-  { id: 'BASE-CLANKER-WETH', name: 'CLANKER / WETH (Base AI)', chainId: 8453, tokenA: TOKENS.CLANKER_BASE, tokenB: TOKENS.WETH_BASE, defaultLoanAmount: '20', approxPriceUSD: 50, assignedAgentId: 7 },
-  { id: 'BASE-MIGGLES-WETH', name: 'MIGGLES / WETH (Base)', chainId: 8453, tokenA: TOKENS.MIGGLES_BASE, tokenB: TOKENS.WETH_BASE, defaultLoanAmount: '30000', approxPriceUSD: 0.02, assignedAgentId: 7 },
+  // 🟢 Agent 7: Base Meme & AI Volatility Tokens (17 Pares)
+  { id: 'BASE-WETH-BRETT',        name: 'WETH / BRETT (Base Meme)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.BRETT_BASE, defaultLoanAmount: '2', approxPriceUSD: 3000, assignedAgentId: 7 },
+  { id: 'BASE-USDC-BRETT',        name: 'USDC / BRETT (Base)', chainId: 8453, tokenA: TOKENS.USDC_BASE, tokenB: TOKENS.BRETT_BASE, defaultLoanAmount: '3000', approxPriceUSD: 1, assignedAgentId: 7 },
+  { id: 'BASE-WETH-DEGEN',        name: 'WETH / DEGEN (Base Meme)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.DEGEN_BASE, defaultLoanAmount: '2', approxPriceUSD: 3000, assignedAgentId: 7 },
+  { id: 'BASE-USDC-DEGEN',        name: 'USDC / DEGEN (Base)', chainId: 8453, tokenA: TOKENS.USDC_BASE, tokenB: TOKENS.DEGEN_BASE, defaultLoanAmount: '3000', approxPriceUSD: 1, assignedAgentId: 7 },
+  { id: 'BASE-WETH-VIRTUAL',      name: 'WETH / VIRTUAL (Base AI)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.VIRTUAL_BASE, defaultLoanAmount: '2', approxPriceUSD: 3000, assignedAgentId: 7 },
+  { id: 'BASE-USDC-VIRTUAL',      name: 'USDC / VIRTUAL (Base AI)', chainId: 8453, tokenA: TOKENS.USDC_BASE, tokenB: TOKENS.VIRTUAL_BASE, defaultLoanAmount: '3000', approxPriceUSD: 1, assignedAgentId: 7 },
+  { id: 'BASE-WETH-TOSHI',        name: 'WETH / TOSHI (Base Meme)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.TOSHI_BASE, defaultLoanAmount: '2', approxPriceUSD: 3000, assignedAgentId: 7 },
+  { id: 'BASE-WETH-HIGHER',       name: 'WETH / HIGHER (Base)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.HIGHER_BASE, defaultLoanAmount: '2', approxPriceUSD: 3000, assignedAgentId: 7 },
+  { id: 'BASE-WETH-CLANKER',      name: 'WETH / CLANKER (Base AI)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.CLANKER_BASE, defaultLoanAmount: '2', approxPriceUSD: 3000, assignedAgentId: 7 },
+  { id: 'BASE-WETH-MIGGLES',      name: 'WETH / MIGGLES (Base)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.MIGGLES_BASE, defaultLoanAmount: '2', approxPriceUSD: 3000, assignedAgentId: 7 },
+  { id: 'BASE-WETH-DEGEN-AERO',   name: 'WETH / DEGEN (Aerodrome Alpha)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.DEGEN_BASE, defaultLoanAmount: '4', approxPriceUSD: 3000, assignedAgentId: 7 },
+  { id: 'BASE-USDC-DEGEN-AERO',   name: 'USDC / DEGEN (Aerodrome Alpha)', chainId: 8453, tokenA: TOKENS.USDC_BASE, tokenB: TOKENS.DEGEN_BASE, defaultLoanAmount: '8000', approxPriceUSD: 1, assignedAgentId: 7 },
+  { id: 'BASE-WETH-BRETT-AERO',   name: 'WETH / BRETT (Aerodrome Alpha)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.BRETT_BASE, defaultLoanAmount: '4', approxPriceUSD: 3000, assignedAgentId: 7 },
+  { id: 'BASE-USDC-BRETT-AERO',   name: 'USDC / BRETT (Aerodrome Alpha)', chainId: 8453, tokenA: TOKENS.USDC_BASE, tokenB: TOKENS.BRETT_BASE, defaultLoanAmount: '8000', approxPriceUSD: 1, assignedAgentId: 7 },
+  { id: 'BASE-WETH-VIRTUAL-AERO', name: 'WETH / VIRTUAL (Aerodrome Alpha)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.VIRTUAL_BASE, defaultLoanAmount: '4', approxPriceUSD: 3000, assignedAgentId: 7 },
+  { id: 'BASE-USDC-VIRTUAL-AERO', name: 'USDC / VIRTUAL (Aerodrome Alpha)', chainId: 8453, tokenA: TOKENS.USDC_BASE, tokenB: TOKENS.VIRTUAL_BASE, defaultLoanAmount: '8000', approxPriceUSD: 1, assignedAgentId: 7 },
+  { id: 'BASE-WETH-TOSHI-AERO',   name: 'WETH / TOSHI (Aerodrome Alpha)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.TOSHI_BASE, defaultLoanAmount: '4', approxPriceUSD: 3000, assignedAgentId: 7 },
 
   // 🩷 Agent 8: Liquid Staking & Restaking Arbitrage (10 Pares)
-  { id: 'ETH-STETH-WETH',   name: 'stETH / WETH (Lido Mainnet)', chainId: 1, tokenA: TOKENS.STETH_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '20', approxPriceUSD: 3000, assignedAgentId: 8 },
-  { id: 'ETH-WSTETH-WETH',  name: 'wstETH / WETH (Lido Mainnet)', chainId: 1, tokenA: TOKENS.WSTETH_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '20', approxPriceUSD: 3500, assignedAgentId: 8 },
-  { id: 'ETH-RETH-WETH',    name: 'rETH / WETH (RocketPool)', chainId: 1, tokenA: TOKENS.RETH_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '20', approxPriceUSD: 3300, assignedAgentId: 8 },
-  { id: 'ETH-EZETH-WETH',   name: 'ezETH / WETH (Renzo Restaking)', chainId: 1, tokenA: TOKENS.EZETH_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '20', approxPriceUSD: 3000, assignedAgentId: 8 },
-  { id: 'ETH-WEETH-WETH',   name: 'weETH / WETH (Ether.fi Restaking)', chainId: 1, tokenA: TOKENS.WEETH_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '20', approxPriceUSD: 3000, assignedAgentId: 8 },
-  { id: 'ETH-RSETH-WETH',   name: 'rsETH / WETH (Kelp Restaking)', chainId: 1, tokenA: TOKENS.RSETH_ETH, tokenB: TOKENS.WETH_ETH, defaultLoanAmount: '20', approxPriceUSD: 3000, assignedAgentId: 8 },
-  { id: 'ARB-WSTETH-WETH',  name: 'wstETH / WETH (Arbitrum LST)', chainId: 42161, tokenA: TOKENS.WSTETH_ARB, tokenB: TOKENS.WETH_ARB, defaultLoanAmount: '10', approxPriceUSD: 3500, assignedAgentId: 8 },
-  { id: 'ARB-WEETH-WETH',   name: 'weETH / WETH (Arbitrum LRT)', chainId: 42161, tokenA: TOKENS.WEETH_ARB, tokenB: TOKENS.WETH_ARB, defaultLoanAmount: '10', approxPriceUSD: 3000, assignedAgentId: 8 },
-  { id: 'BASE-WSTETH-WETH', name: 'wstETH / WETH (Base LST)', chainId: 8453, tokenA: TOKENS.WSTETH_BASE, tokenB: TOKENS.WETH_BASE, defaultLoanAmount: '10', approxPriceUSD: 3500, assignedAgentId: 8 },
-  { id: 'BASE-WEETH-WETH',  name: 'weETH / WETH (Base LRT)', chainId: 8453, tokenA: TOKENS.WEETH_BASE, tokenB: TOKENS.WETH_BASE, defaultLoanAmount: '10', approxPriceUSD: 3000, assignedAgentId: 8 },
+  { id: 'ETH-WETH-STETH',   name: 'WETH / stETH (Lido Mainnet)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.STETH_ETH, defaultLoanAmount: '10', approxPriceUSD: 3000, assignedAgentId: 8 },
+  { id: 'ETH-WETH-WSTETH',  name: 'WETH / wstETH (Lido Mainnet)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.WSTETH_ETH, defaultLoanAmount: '10', approxPriceUSD: 3000, assignedAgentId: 8 },
+  { id: 'ETH-WETH-RETH',    name: 'WETH / rETH (RocketPool)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.RETH_ETH, defaultLoanAmount: '10', approxPriceUSD: 3000, assignedAgentId: 8 },
+  { id: 'ETH-WETH-EZETH',   name: 'WETH / ezETH (Renzo Restaking)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.EZETH_ETH, defaultLoanAmount: '10', approxPriceUSD: 3000, assignedAgentId: 8 },
+  { id: 'ETH-WETH-WEETH',   name: 'WETH / weETH (Ether.fi Restaking)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.WEETH_ETH, defaultLoanAmount: '10', approxPriceUSD: 3000, assignedAgentId: 8 },
+  { id: 'ETH-WETH-RSETH',   name: 'WETH / rsETH (Kelp Restaking)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.RSETH_ETH, defaultLoanAmount: '10', approxPriceUSD: 3000, assignedAgentId: 8 },
+  { id: 'ARB-WETH-WSTETH',  name: 'WETH / wstETH (Arbitrum LST)', chainId: 42161, tokenA: TOKENS.WETH_ARB, tokenB: TOKENS.WSTETH_ARB, defaultLoanAmount: '5', approxPriceUSD: 3000, assignedAgentId: 8 },
+  { id: 'ARB-WETH-WEETH',   name: 'WETH / weETH (Arbitrum LRT)', chainId: 42161, tokenA: TOKENS.WETH_ARB, tokenB: TOKENS.WEETH_ARB, defaultLoanAmount: '5', approxPriceUSD: 3000, assignedAgentId: 8 },
+  { id: 'BASE-WETH-WSTETH', name: 'WETH / wstETH (Base LST)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.WSTETH_BASE, defaultLoanAmount: '5', approxPriceUSD: 3000, assignedAgentId: 8 },
+  { id: 'BASE-WETH-WEETH',  name: 'WETH / weETH (Base LRT)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.WEETH_BASE, defaultLoanAmount: '5', approxPriceUSD: 3000, assignedAgentId: 8 },
 
   // 🧡 Agent 9: Cross-L2 High Volume Spreads (8 Pares)
   { id: 'ETH-WETH-USDC-CEX',  name: 'WETH / USDC (CEX Spread ETH)', chainId: 1, tokenA: TOKENS.WETH_ETH, tokenB: TOKENS.USDC_ETH, defaultLoanAmount: '15', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 9 },
   { id: 'ARB-WETH-USDC-CEX',  name: 'WETH / USDC (CEX Spread ARB)', chainId: 42161, tokenA: TOKENS.WETH_ARB, tokenB: TOKENS.USDC_ARB, defaultLoanAmount: '10', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 9 },
   { id: 'BASE-WETH-USDC-CEX', name: 'WETH / USDC (CEX Spread BASE)', chainId: 8453, tokenA: TOKENS.WETH_BASE, tokenB: TOKENS.USDC_BASE, defaultLoanAmount: '8', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 9 },
   { id: 'OP-WETH-USDC-CEX',   name: 'WETH / USDC (CEX Spread OP)', chainId: 10, tokenA: TOKENS.WETH_OP, tokenB: TOKENS.USDC_OP, defaultLoanAmount: '8', approxPriceUSD: 3000, cexSymbol: 'ETHUSDT', assignedAgentId: 9 },
-  { id: 'ARB-ARB-USDT-CEX',   name: 'ARB / USDT (CEX Spread ARB)', chainId: 42161, tokenA: TOKENS.ARB_ARB, tokenB: TOKENS.USDT_ARB, defaultLoanAmount: '10000', approxPriceUSD: 0.6, cexSymbol: 'ARBUSDT', assignedAgentId: 9 },
-  { id: 'OP-OP-USDT-CEX',     name: 'OP / USDT (CEX Spread OP)', chainId: 10, tokenA: TOKENS.OP_OP, tokenB: TOKENS.USDT_OP, defaultLoanAmount: '4000', approxPriceUSD: 1.5, cexSymbol: 'OPUSDT', assignedAgentId: 9 },
-  { id: 'BASE-AERO-USDC-CEX', name: 'AERO / USDC (CEX Spread BASE)', chainId: 8453, tokenA: TOKENS.AERO_BASE, tokenB: TOKENS.USDC_BASE, defaultLoanAmount: '5000', approxPriceUSD: 1.2, assignedAgentId: 9 },
-  { id: 'ETH-LINK-USDT-CEX',  name: 'LINK / USDT (CEX Spread ETH)', chainId: 1, tokenA: TOKENS.LINK_ETH, tokenB: TOKENS.USDT_ETH, defaultLoanAmount: '800', approxPriceUSD: 16, cexSymbol: 'LINKUSDT', assignedAgentId: 9 },
+  { id: 'ARB-USDT-ARB-CEX',   name: 'USDT / ARB (CEX Spread ARB)', chainId: 42161, tokenA: TOKENS.USDT_ARB, tokenB: TOKENS.ARB_ARB, defaultLoanAmount: '5000', approxPriceUSD: 1, cexSymbol: 'ARBUSDT', assignedAgentId: 9 },
+  { id: 'OP-USDT-OP-CEX',     name: 'USDT / OP (CEX Spread OP)', chainId: 10, tokenA: TOKENS.USDT_OP, tokenB: TOKENS.OP_OP, defaultLoanAmount: '5000', approxPriceUSD: 1, cexSymbol: 'OPUSDT', assignedAgentId: 9 },
+  { id: 'BASE-USDC-AERO-CEX', name: 'USDC / AERO (CEX Spread BASE)', chainId: 8453, tokenA: TOKENS.USDC_BASE, tokenB: TOKENS.AERO_BASE, defaultLoanAmount: '5000', approxPriceUSD: 1, assignedAgentId: 9 },
+  { id: 'ETH-USDT-LINK-CEX',  name: 'USDT / LINK (CEX Spread ETH)', chainId: 1, tokenA: TOKENS.USDT_ETH, tokenB: TOKENS.LINK_ETH, defaultLoanAmount: '5000', approxPriceUSD: 1, cexSymbol: 'LINKUSDT', assignedAgentId: 9 },
 
   // 🩵 Agent 10: Stablecoin Peg Arbitrage (10 Pares)
   { id: 'ETH-USDC-USDT',   name: 'USDC / USDT (Mainnet Stable)', chainId: 1, tokenA: TOKENS.USDC_ETH, tokenB: TOKENS.USDT_ETH, defaultLoanAmount: '5000', approxPriceUSD: 1, cexSymbol: 'USDCUSDT', assignedAgentId: 10 },

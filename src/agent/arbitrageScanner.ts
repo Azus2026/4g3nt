@@ -7,7 +7,7 @@ import { SweetSpotOptimizer } from '../math/sweetSpotOptimizer';
 export class ArbitrageScanner {
   private client: ProtocolinkClient;
   private cexFetcher: CEXFetcher;
-  private supportedProtocols = ['velora-v2-all', 'paraswap-v5', 'openocean-v2'];
+  private supportedProtocols = ['uniswap-v3', 'camelot-v3', 'aerodrome-base', 'sushiswap-v3', 'balancer-v2', 'curve-v2', 'paraswap-v5'];
 
   constructor() {
     this.client = new ProtocolinkClient();
@@ -43,7 +43,11 @@ export class ArbitrageScanner {
     if (leg2Quotes.length === 0) return null;
 
     leg2Quotes.sort((a, b) => parseFloat(b.outputAmount) - parseFloat(a.outputAmount));
-    const bestLeg2 = leg2Quotes[0];
+    const differentProtoLeg2 = leg2Quotes.find(q => q.protocolId.toLowerCase() !== bestLeg1.protocolId.toLowerCase());
+    if (!differentProtoLeg2) {
+      return null;
+    }
+    const bestLeg2 = differentProtoLeg2;
 
     // 3. CEX Reference Ticker
     let cexAvgPriceUSD: number | undefined;
@@ -66,6 +70,11 @@ export class ArbitrageScanner {
     const totalRequiredToRepay = loanNum + flashLoanFeeNum;
 
     const returnTokenANum = parseFloat(bestLeg2.outputAmount);
+    // Filtro de Sensatez de Liquidez: Si el retorno es menor al 80% del préstamo, el pool no tiene liquidez real
+    if (returnTokenANum < totalRequiredToRepay * 0.80) {
+      return null;
+    }
+
     const grossProfitTokenA = returnTokenANum - totalRequiredToRepay;
     const grossProfitUSD = grossProfitTokenA * approxPriceUSD;
 
@@ -74,9 +83,9 @@ export class ArbitrageScanner {
     const gweiPrice = chainId === 1 ? 20 : 0.1;
     const estimatedGasEth = (gasUnits * gweiPrice * 1e-9);
     const estimatedGasUSD = estimatedGasEth * (pair.id.includes('WETH') ? approxPriceUSD : 3000);
-
     const netProfitUSD = grossProfitUSD - estimatedGasUSD;
-    const isProfitable = netProfitUSD >= ENV.minProfitUSD;
+    const isDifferentProtocols = bestLeg1.protocolId.toLowerCase() !== bestLeg2.protocolId.toLowerCase();
+    const isProfitable = isDifferentProtocols && (netProfitUSD >= ENV.minProfitUSD);
 
     return {
       pairId: pair.id,

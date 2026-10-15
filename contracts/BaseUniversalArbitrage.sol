@@ -80,18 +80,23 @@ interface IFlashLoanRecipient {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  Contrato Universal Multi-DEX: 2-Leg Espacial + 3-Leg Triangular
+//  Contrato Universal de Arbitraje en Base
+//  Soporta Spot Directo, Aave V3 y Balancer V2 (0% Fee)
 // ═══════════════════════════════════════════════════════════════
 
 contract BaseUniversalArbitrage is IFlashLoanRecipient {
     using SafeERC20 for IERC20;
 
-    address public immutable owner;
+    address public owner;
 
-    // ── Routers Oficiales en Base (Inmutables) ──
+    // ── Direcciones Inmutables en Base Mainnet (ChainID 8453) ──
+    address public constant WETH = 0x4200000000000000000000000000000000000006;
+    address public constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
+
     IUniswapV3Router public constant UNIV3_ROUTER = IUniswapV3Router(0x2626664c2603336E57B271c5C0b26F421741e481);
     IAerodromeSlipstreamRouter public constant AERO_CL_ROUTER = IAerodromeSlipstreamRouter(0xBE6D8f0d05cC4be24d5167a3eF062215bE6D18a5);
     IAerodromeV2Router public constant AERO_V2_ROUTER = IAerodromeV2Router(0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43);
+    address public constant AERO_V2_FACTORY = 0x420DD381b31aEf6683db6B902084cB0FFECe40Da;
     IUniswapV3Router public constant PANCAKE_V3_ROUTER = IUniswapV3Router(0x1b81D678ffb9C0263b24A97847620C99d213eB14);
     IUniswapV3Router public constant SUSHISWAP_V3_ROUTER = IUniswapV3Router(0xFB7eF66a7e61224DD6FcD0D7d9C3be5C8B049b9f);
     IPool public constant AAVE_POOL = IPool(0xA238Dd80C259a72e81d7e4664a9801593F98d1c5);
@@ -109,6 +114,10 @@ contract BaseUniversalArbitrage is IFlashLoanRecipient {
     uint256 private constant _NOT_ENTERED = 1;
     uint256 private constant _ENTERED = 2;
     uint256 private _status = _NOT_ENTERED;
+
+    // ── Variables de Retorno y Seguridad de Callbacks ──
+    uint256 private _lastProfit;
+    bool private _inFlashLoan;
 
     struct SpatialRoute {
         address tokenIn;
@@ -161,9 +170,9 @@ contract BaseUniversalArbitrage is IFlashLoanRecipient {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  1. Arbitraje Espacial Directo 2-Leg Spot ($35 WETH)
+    //  1. Arbitraje Espacial Directo 2-Leg Spot
     // ═══════════════════════════════════════════════════════════
-    function executeSpotSpatial(SpatialRoute calldata route, uint256 amountIn) external onlyOwner nonReentrant {
+    function executeSpotSpatial(SpatialRoute calldata route, uint256 amountIn) external onlyOwner nonReentrant returns (uint256 profit) {
         IERC20(route.tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
 
         uint256 intermediateAmount = _swap(route.dexBuy, route.tokenIn, route.tokenIntermediate, amountIn, route.feeOrSpacingBuy);
@@ -173,15 +182,16 @@ contract BaseUniversalArbitrage is IFlashLoanRecipient {
             revert NotProfitable(finalAmount, amountIn + route.minProfit);
         }
 
-        uint256 profit = finalAmount - amountIn;
+        profit = finalAmount - amountIn;
         IERC20(route.tokenIn).safeTransfer(owner, finalAmount);
         emit SpatialExecuted(route.tokenIn, amountIn, finalAmount, profit);
+        return profit;
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  2. Arbitraje Triangular 3-Leg Spot ($35 WETH)
+    //  2. Arbitraje Triangular 3-Leg Spot
     // ═══════════════════════════════════════════════════════════
-    function executeSpotTriangular(TriangularRoute calldata route, uint256 amountIn) external onlyOwner nonReentrant {
+    function executeSpotTriangular(TriangularRoute calldata route, uint256 amountIn) external onlyOwner nonReentrant returns (uint256 profit) {
         IERC20(route.tokenA).safeTransferFrom(msg.sender, address(this), amountIn);
 
         uint256 out1 = _swap(route.dex1, route.tokenA, route.tokenB, amountIn, route.feeOrSpacing1);
@@ -192,41 +202,58 @@ contract BaseUniversalArbitrage is IFlashLoanRecipient {
             revert NotProfitable(out3, amountIn + route.minProfit);
         }
 
-        uint256 profit = out3 - amountIn;
+        profit = out3 - amountIn;
         IERC20(route.tokenA).safeTransfer(owner, out3);
         emit TriangularExecuted(route.tokenA, amountIn, out3, profit);
+        return profit;
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  3. Flash Loans con Aave V3 ($0 Capital)
+    //  3. Flash Loans con Aave V3
     // ═══════════════════════════════════════════════════════════
-    function executeFlashLoanSpatial(SpatialRoute calldata route, uint256 loanAmount) external onlyOwner nonReentrant {
+    function executeFlashLoanSpatial(SpatialRoute calldata route, uint256 loanAmount) external onlyOwner nonReentrant returns (uint256 profit) {
+        _inFlashLoan = true;
+        _lastProfit = 0;
         bytes memory params = abi.encode(uint8(2), abi.encode(route));
         AAVE_POOL.flashLoanSimple(address(this), route.tokenIn, loanAmount, params, 0);
+        _inFlashLoan = false;
+        return _lastProfit;
     }
 
-    function executeFlashLoanTriangular(TriangularRoute calldata route, uint256 loanAmount) external onlyOwner nonReentrant {
+    function executeFlashLoanTriangular(TriangularRoute calldata route, uint256 loanAmount) external onlyOwner nonReentrant returns (uint256 profit) {
+        _inFlashLoan = true;
+        _lastProfit = 0;
         bytes memory params = abi.encode(uint8(3), abi.encode(route));
         AAVE_POOL.flashLoanSimple(address(this), route.tokenA, loanAmount, params, 0);
+        _inFlashLoan = false;
+        return _lastProfit;
     }
 
     // ── Flash Loans con Balancer V2 (0% Fee) ──
-    function executeBalancerFlashLoanSpatial(SpatialRoute calldata route, uint256 loanAmount) external onlyOwner nonReentrant {
+    function executeBalancerFlashLoanSpatial(SpatialRoute calldata route, uint256 loanAmount) external onlyOwner nonReentrant returns (uint256 profit) {
+        _inFlashLoan = true;
+        _lastProfit = 0;
         IERC20[] memory tokens = new IERC20[](1);
         tokens[0] = IERC20(route.tokenIn);
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = loanAmount;
         bytes memory userData = abi.encode(uint8(2), abi.encode(route));
         IBalancerVault(BALANCER_VAULT).flashLoan(address(this), tokens, amounts, userData);
+        _inFlashLoan = false;
+        return _lastProfit;
     }
 
-    function executeBalancerFlashLoanTriangular(TriangularRoute calldata route, uint256 loanAmount) external onlyOwner nonReentrant {
+    function executeBalancerFlashLoanTriangular(TriangularRoute calldata route, uint256 loanAmount) external onlyOwner nonReentrant returns (uint256 profit) {
+        _inFlashLoan = true;
+        _lastProfit = 0;
         IERC20[] memory tokens = new IERC20[](1);
         tokens[0] = IERC20(route.tokenA);
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = loanAmount;
         bytes memory userData = abi.encode(uint8(3), abi.encode(route));
         IBalancerVault(BALANCER_VAULT).flashLoan(address(this), tokens, amounts, userData);
+        _inFlashLoan = false;
+        return _lastProfit;
     }
 
     function receiveFlashLoan(
@@ -236,6 +263,7 @@ contract BaseUniversalArbitrage is IFlashLoanRecipient {
         bytes memory userData
     ) external override {
         require(msg.sender == BALANCER_VAULT, "Caller not Balancer Vault");
+        require(_inFlashLoan, "Unauthorized flash loan initiation");
 
         (uint8 mode, bytes memory routeData) = abi.decode(userData, (uint8, bytes));
         address asset = address(tokens[0]);
@@ -264,6 +292,7 @@ contract BaseUniversalArbitrage is IFlashLoanRecipient {
 
         IERC20(asset).safeTransfer(BALANCER_VAULT, amountOwed);
         uint256 profit = currentBalance - amountOwed;
+        _lastProfit = profit;
         if (profit > 0) {
             IERC20(asset).safeTransfer(owner, profit);
         }
@@ -280,6 +309,7 @@ contract BaseUniversalArbitrage is IFlashLoanRecipient {
     ) external returns (bool) {
         require(msg.sender == address(AAVE_POOL), "Invalid caller");
         require(initiator == address(this), "Invalid initiator");
+        require(_inFlashLoan, "Unauthorized flash loan initiation");
 
         (uint8 mode, bytes memory routeData) = abi.decode(params, (uint8, bytes));
         uint256 totalOwed = amount + premium;
@@ -305,6 +335,7 @@ contract BaseUniversalArbitrage is IFlashLoanRecipient {
 
         IERC20(asset).forceApprove(address(AAVE_POOL), totalOwed);
         uint256 profit = finalOut - totalOwed;
+        _lastProfit = profit;
         if (profit > 0) {
             IERC20(asset).safeTransfer(owner, profit);
         }
@@ -354,7 +385,7 @@ contract BaseUniversalArbitrage is IFlashLoanRecipient {
                 from: tokenIn,
                 to: tokenOut,
                 stable: isStable,
-                factory: address(0)
+                factory: AERO_V2_FACTORY
             });
             uint256[] memory amounts = AERO_V2_ROUTER.swapExactTokensForTokens(
                 amountIn,

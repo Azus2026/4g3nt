@@ -136,8 +136,12 @@ export class AgentWorker {
       );
       const gasCostUSD = gasCalc.totalGasUSD;
 
-      const depth1 = p1 ? Number(p1.liquidity) / 1e18 : 1.0;
-      const depth2 = p2 ? Number(p2.liquidity) / 1e18 : 1.0;
+      // Escala geométrica correcta de decimales para Uniswap V3 (L = sqrt(x * y))
+      const dec0 = pair.tokenA.decimals || 18;
+      const dec1 = pair.tokenB.decimals || 18;
+      const geometricScale = 10 ** ((dec0 + dec1) / 2);
+      const depth1 = p1 ? (Number(p1.liquidity) / geometricScale) * (pair.approxPriceUSD || 2500) : 100_000.0;
+      const depth2 = p2 ? (Number(p2.liquidity) / geometricScale) * (pair.approxPriceUSD || 2500) : 100_000.0;
       let sweetSpot = { isViable: false, optimalLoanUSD: 0, optimalLoanAmount: '0', sweetSpotRatio: 1.0, expectedNetProfitUSD: 0, expectedGrossProfitUSD: 0 };
 
       const regimentId = (this.definition as any).regimentId || 1;

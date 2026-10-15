@@ -68,7 +68,7 @@ export const LENDING_POOLS: LendingPoolConfig[] = [
 export function getSampleLiquidationCandidates(): LiquidationCandidate[] {
   return [
     {
-      userAddress: '0x71C...89A',
+      userAddress: '0x71C000000000000000000000000000000000089A',
       protocol: 'AAVE_V3',
       chainId: 8453,
       debtToken: TOKENS.USDC_BASE,
@@ -78,7 +78,7 @@ export function getSampleLiquidationCandidates(): LiquidationCandidate[] {
       liquidationBonusPercent: 5.0
     },
     {
-      userAddress: '0x42A...91B',
+      userAddress: '0x42A000000000000000000000000000000000091B',
       protocol: 'RADIANT',
       chainId: 42161,
       debtToken: TOKENS.USDT_ARB,
@@ -88,7 +88,7 @@ export function getSampleLiquidationCandidates(): LiquidationCandidate[] {
       liquidationBonusPercent: 10.0
     },
     {
-      userAddress: '0x99F...33C',
+      userAddress: '0x99F000000000000000000000000000000000033C',
       protocol: 'MORPHO_BLUE',
       chainId: 1,
       debtToken: TOKENS.DAI_ETH,

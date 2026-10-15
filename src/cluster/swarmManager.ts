@@ -66,8 +66,8 @@ export class SwarmManager {
       const scanPromises = workerList.map(w => w.runFastMemoryScan());
       await Promise.all(scanPromises);
 
-      // Registrar 250,000 pools verificadas en este ciclo
-      SERVER_STATS.scansCompleted += 250000;
+      // Registrar pools verificadas en este ciclo con métricas reales
+      SERVER_STATS.scansCompleted += workerList.length;
       if (this.cycleCounter % 5 === 0) {
         savePersistedStats();
       }
@@ -80,9 +80,7 @@ export class SwarmManager {
         const randomPairId = samplePairs[Math.floor(Math.random() * samplePairs.length)];
         const pair = MULTI_CHAIN_ARBITRAGE_PAIRS.find(p => p.id === randomPairId) || MULTI_CHAIN_ARBITRAGE_PAIRS[0];
 
-        const regId = Math.floor(Math.random() * 2500) + 1;
-        const legionId = Math.floor((regId - 1) / 10) + 1;
-        addScanLog(`⚡ [CICLO #${this.cycleCounter}] 250,000 Agentes: 250,000 pools (10 Cadenas) verificadas en ${duration}ms | Legión #${legionId} (Regimiento #${regId}) activo`);
+        addScanLog(`⚡ [CICLO #${this.cycleCounter}] Swarm Multicall: ${workerList.length} pares verificados en ${duration}ms | Pool State Engine sinc`);
         addScanLog(`🔍 [TELEMETRÍA EN VIVO] ${pair.name} (ChainID: ${pair.chainId}) | Verificando liquidez y ticks...`);
       }
     };

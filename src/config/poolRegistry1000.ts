@@ -33,7 +33,8 @@ export class PoolRegistry1000 {
     const seenPools = new Set<string>();
 
     // 1. Integrar todas las pools reales de KNOWN_ONCHAIN_POOLS
-    for (const [key, entries] of Object.entries(KNOWN_ONCHAIN_POOLS)) {
+    const knownPools = (typeof KNOWN_ONCHAIN_POOLS !== 'undefined' && KNOWN_ONCHAIN_POOLS) ? KNOWN_ONCHAIN_POOLS : {};
+    for (const [key, entries] of Object.entries(knownPools)) {
       const parts = key.split('-');
       const chainId = parseInt(parts[0], 10);
       const symbolA = parts[1];
@@ -72,7 +73,8 @@ export class PoolRegistry1000 {
     }
 
     // 2. Integrar pares de MULTI_CHAIN_ARBITRAGE_PAIRS verificando direcciones
-    for (const pair of MULTI_CHAIN_ARBITRAGE_PAIRS) {
+    const multiPairs = (typeof MULTI_CHAIN_ARBITRAGE_PAIRS !== 'undefined' && MULTI_CHAIN_ARBITRAGE_PAIRS) ? MULTI_CHAIN_ARBITRAGE_PAIRS : [];
+    for (const pair of multiPairs) {
       const feeTiers = [500, 3000, 100];
       const isReversed = pair.tokenA.address.toLowerCase() > pair.tokenB.address.toLowerCase();
       const [t0, t1] = isReversed ? [pair.tokenB, pair.tokenA] : [pair.tokenA, pair.tokenB];

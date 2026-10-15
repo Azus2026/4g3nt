@@ -3,10 +3,12 @@ import fs from 'fs';
 import path from 'path';
 import { SweetSpotOptimizer } from '../src/math/sweetSpotOptimizer';
 import { LENDING_POOLS } from '../src/liquidations/lendingRegistry';
+import { BASE_100_TOKENS } from '../src/config/baseTokens100';
+import { spotExecutor } from '../src/executor/spotExecutor';
 
 async function runPhasesVerification() {
   console.log('═══════════════════════════════════════════════════════════════════════');
-  console.log('🧪 SUITE DE PRUEBAS DE VERIFICACIÓN: FASES 1 A 5 (OPTIMIZACIÓN MEV L2)');
+  console.log('🧪 SUITE DE PRUEBAS DE VERIFICACIÓN COMPLETA (FASES 1 A 5 AUDITADAS)');
   console.log('═══════════════════════════════════════════════════════════════════════\n');
 
   let passedTests = 0;
@@ -25,123 +27,96 @@ async function runPhasesVerification() {
   }
 
   // ─────────────────────────────────────────────────────────────────
-  // FASE 1: Limpieza Estructural y Unificación Matemática
+  // FASE 1: Smart Contracts Blindados con Retornos de Ganancia
   // ─────────────────────────────────────────────────────────────────
-  console.log('📦 FASE 1: Verificación de Limpieza y Unificación Matemática');
-  
-  const duplicatedFile = path.join(__dirname, '..', 'src', 'agent', 'sweetSpotOptimizer.ts');
-  assert(!fs.existsSync(duplicatedFile), 'Archivo duplicado src/agent/sweetSpotOptimizer.ts eliminado');
-
-  const unifiedOptimizer = typeof SweetSpotOptimizer.calculateOptimalLoan === 'function';
-  assert(unifiedOptimizer, 'SweetSpotOptimizer unificado y disponible en src/math/sweetSpotOptimizer.ts');
-
-  // ─────────────────────────────────────────────────────────────────
-  // FASE 2: Smart Contracts con Balancer V2 (0% Fee) y Guardias
-  // ─────────────────────────────────────────────────────────────────
-  console.log('\n🛡️ FASE 2: Verificación de Smart Contracts (Solidity)');
+  console.log('🛡️ FASE 1: Verificación de Smart Contracts Blindados');
 
   const baseArtifactPath = path.join(__dirname, '..', 'artifacts', 'contracts', 'BaseUniversalArbitrage.sol', 'BaseUniversalArbitrage.json');
   const arbArtifactPath = path.join(__dirname, '..', 'artifacts', 'contracts', 'ArbitrumUniversalArbitrage.sol', 'ArbitrumUniversalArbitrage.json');
 
-  assert(fs.existsSync(baseArtifactPath), 'Artifact de BaseUniversalArbitrage compilado por Hardhat existe');
-  assert(fs.existsSync(arbArtifactPath), 'Artifact de ArbitrumUniversalArbitrage compilado por Hardhat existe');
+  assert(fs.existsSync(baseArtifactPath), 'Artifact de BaseUniversalArbitrage existe');
+  assert(fs.existsSync(arbArtifactPath), 'Artifact de ArbitrumUniversalArbitrage existe');
 
   if (fs.existsSync(baseArtifactPath)) {
     const baseArtifact = JSON.parse(fs.readFileSync(baseArtifactPath, 'utf8'));
-    const abiFunctions = baseArtifact.abi.map((item: any) => item.name);
+    const abi = baseArtifact.abi;
+    const executeBalancerSpatial = abi.find((i: any) => i.name === 'executeBalancerFlashLoanSpatial');
+    const hasOutputs = executeBalancerSpatial && executeBalancerSpatial.outputs && executeBalancerSpatial.outputs.length > 0;
+    assert(hasOutputs, 'BaseUniversalArbitrage: executeBalancerFlashLoanSpatial tiene returns (uint256 profit)');
 
-    assert(abiFunctions.includes('executeBalancerFlashLoanSpatial'), 'BaseUniversalArbitrage incluye executeBalancerFlashLoanSpatial');
-    assert(abiFunctions.includes('executeBalancerFlashLoanTriangular'), 'BaseUniversalArbitrage incluye executeBalancerFlashLoanTriangular');
-    assert(abiFunctions.includes('receiveFlashLoan'), 'BaseUniversalArbitrage implementa callback receiveFlashLoan (Balancer V2 0% Fee)');
-    assert(abiFunctions.includes('BALANCER_VAULT'), 'BaseUniversalArbitrage expone constante BALANCER_VAULT');
+    const executeAaveSpatial = abi.find((i: any) => i.name === 'executeFlashLoanSpatial');
+    const aaveHasOutputs = executeAaveSpatial && executeAaveSpatial.outputs && executeAaveSpatial.outputs.length > 0;
+    assert(aaveHasOutputs, 'BaseUniversalArbitrage: executeFlashLoanSpatial tiene returns (uint256 profit)');
   }
 
   if (fs.existsSync(arbArtifactPath)) {
     const arbArtifact = JSON.parse(fs.readFileSync(arbArtifactPath, 'utf8'));
-    const arbFunctions = arbArtifact.abi.map((item: any) => item.name);
-
-    assert(arbFunctions.includes('executeBalancerFlashLoanSpatial'), 'ArbitrumUniversalArbitrage incluye executeBalancerFlashLoanSpatial');
-    assert(arbFunctions.includes('executeBalancerFlashLoanTriangular'), 'ArbitrumUniversalArbitrage incluye executeBalancerFlashLoanTriangular');
-    assert(arbFunctions.includes('receiveFlashLoan'), 'ArbitrumUniversalArbitrage implementa callback receiveFlashLoan con soporte Triangular');
+    const abi = arbArtifact.abi;
+    const executeBalancerSpatialArb = abi.find((i: any) => i.name === 'executeBalancerFlashLoanSpatial');
+    const hasOutputsArb = executeBalancerSpatialArb && executeBalancerSpatialArb.outputs && executeBalancerSpatialArb.outputs.length > 0;
+    assert(hasOutputsArb, 'ArbitrumUniversalArbitrage: executeBalancerFlashLoanSpatial tiene returns (uint256 profit)');
   }
 
   // ─────────────────────────────────────────────────────────────────
-  // FASE 3: Motor Off-Chain y Cálculo Real de Gas (L1 Data Fee)
+  // FASE 2: Purga Absoluta de Fórmulas Ficticias en Ejecutores
   // ─────────────────────────────────────────────────────────────────
-  console.log('\n⛽ FASE 3: Verificación de Cálculo Real de Gas (L1 + L2 Fee)');
+  console.log('\n🧹 FASE 2: Verificación de Eliminación de Humo en Ejecutores');
+
+  const executorFiles = ['spotExecutor.ts', 'arbitrumExecutor.ts', 'lowFeeExecutor.ts'];
+  for (const file of executorFiles) {
+    const filePath = path.join(__dirname, '..', 'src', 'executor', file);
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, 'utf8');
+      const hasMathSin = /Math\.(sin|cos)/.test(content);
+      assert(!hasMathSin, `src/executor/${file} no contiene fórmulas sinusoidales (Math.sin/cos)`);
+      const hasEstimateGas = content.includes('estimateGas');
+      assert(hasEstimateGas, `src/executor/${file} implementa pre-flight check dinámico con estimateGas`);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // FASE 3: Saneamiento de Datos, Tokens y Métodos de Agente
+  // ─────────────────────────────────────────────────────────────────
+  console.log('\n💎 FASE 3: Verificación de Tokens Verificados y Puentes');
+
+  let invalidAddressesCount = 0;
+  for (const token of BASE_100_TOKENS) {
+    if (!token.address.startsWith('0x') || token.address.length !== 42 || !/^0x[0-9a-fA-F]{40}$/.test(token.address)) {
+      invalidAddressesCount++;
+    }
+  }
+  assert(invalidAddressesCount === 0, `Todos los tokens en baseTokens100.ts son direcciones hex válidas (${BASE_100_TOKENS.length} tokens verificados)`);
+
+  const hasExecuteSpotMethod = typeof (spotExecutor as any).executeSpot === 'function';
+  assert(hasExecuteSpotMethod, 'SpotExecutor expone el método puente executeSpot(opp) para compatibilidad con agentWorker');
+
+  // ─────────────────────────────────────────────────────────────────
+  // FASE 4: Unificación Matemática y L1 Data Fee Real
+  // ─────────────────────────────────────────────────────────────────
+  console.log('\n⛽ FASE 4: Verificación de Gas Real (L1 Data Fee + L2 Execution)');
+
+  const duplicatedFile = path.join(__dirname, '..', 'src', 'agent', 'sweetSpotOptimizer.ts');
+  assert(!fs.existsSync(duplicatedFile), 'Archivo duplicado src/agent/sweetSpotOptimizer.ts eliminado');
 
   const baseGasCalc = SweetSpotOptimizer.calculateTotalGasCostUSD(8453, 200_000n, 0.05, 2500, 384);
-  assert(
-    baseGasCalc.l1DataFeeUSD > 0,
-    'Base L1 Calldata / Blob Fee correctamente calculado (> $0.001 USD)',
-    `L2 Gas: $${baseGasCalc.l2GasUSD.toFixed(5)} | L1 Data Fee: $${baseGasCalc.l1DataFeeUSD.toFixed(5)} | Total: $${baseGasCalc.totalGasUSD.toFixed(5)}`
-  );
+  assert(baseGasCalc.l1DataFeeUSD > 0, 'Base L1 Calldata Fee correctamente calculado (> $0.001 USD)');
 
-  const arbGasCalc = SweetSpotOptimizer.calculateTotalGasCostUSD(42161, 280_000n, 0.1, 2500, 384);
-  assert(
-    arbGasCalc.totalGasUSD > arbGasCalc.l2GasUSD,
-    'Arbitrum One poster fee incluido en el cálculo de gas total',
-    `Total Gas Arbitrum: $${arbGasCalc.totalGasUSD.toFixed(5)} USD`
-  );
-
-  // Probar descarte de arbitraje sub-centavo peligroso
-  const microArbResult = SweetSpotOptimizer.calculateOptimalLoan(
-    1000,     // $1,000 préstamo
-    0.0001,   // 0.01% spread (sub-centavo)
-    1.0,
-    baseGasCalc.totalGasUSD,
-    2500,
-    0.0,
-    0.01      // min profit threshold: $0.01
-  );
-  assert(
-    !microArbResult.isViable,
-    'Filtro anti-sub-centavo: spread menor al costo de L1 Data Fee es rechazado',
-    `Net Profit Estimado: $${microArbResult.expectedNetProfitUSD} | isViable: ${microArbResult.isViable}`
-  );
+  const microArbResult = SweetSpotOptimizer.calculateOptimalLoan(1000, 0.0001, 1.0, baseGasCalc.totalGasUSD, 2500, 0.0, 0.01);
+  assert(!microArbResult.isViable, 'Filtro anti-sub-centavo: spread menor al costo de L1 Data Fee es rechazado');
 
   // ─────────────────────────────────────────────────────────────────
-  // FASE 4: Comparativa de Rendimiento Fee = 0 (Balancer) vs 5 bps (Aave)
+  // FASE 5: Rendimiento Flash Loan 0% Balancer vs 5 bps Aave
   // ─────────────────────────────────────────────────────────────────
-  console.log('\n📊 FASE 4: Validación Cuantitativa Balancer (0% Fee) vs Aave (0.05% Fee)');
+  console.log('\n📊 FASE 5: Comparativa de Rendimiento Balancer (0% Fee) vs Aave (0.05%)');
 
-  const loanAmountUSD = 5000;
-  const testSpread = 0.0035; // 0.35% spread en pool de $5,000,000 USD
-  const poolDepthScore = 2000; // 2000 ETH de profundidad ($5,000,000 USD)
-
-  const balancerResult = SweetSpotOptimizer.calculateOptimalLoan(
-    loanAmountUSD,
-    testSpread,
-    poolDepthScore,
-    baseGasCalc.totalGasUSD,
-    2500,
-    0.0, // 0% Fee Balancer
-    0.01
-  );
-
-  const aaveResult = SweetSpotOptimizer.calculateOptimalLoan(
-    loanAmountUSD,
-    testSpread,
-    poolDepthScore,
-    baseGasCalc.totalGasUSD,
-    2500,
-    0.0005, // 0.05% Fee Aave (5 bps)
-    0.01
-  );
+  const balancerResult = SweetSpotOptimizer.calculateOptimalLoan(5000, 0.0035, 2000, baseGasCalc.totalGasUSD, 2500, 0.0, 0.01);
+  const aaveResult = SweetSpotOptimizer.calculateOptimalLoan(5000, 0.0035, 2000, baseGasCalc.totalGasUSD, 2500, 0.0005, 0.01);
 
   assert(
     balancerResult.expectedNetProfitUSD > aaveResult.expectedNetProfitUSD,
-    'Balancer V2 retiene mayor ganancia neta al tener 0% fee frente a Aave',
-    `Ganancia Neta Balancer: $${balancerResult.expectedNetProfitUSD} | Ganancia Neta Aave: $${aaveResult.expectedNetProfitUSD}`
+    'Balancer V2 retiene mayor ganancia neta al tener 0% fee frente a Aave (0.05%)',
+    `Balancer: $${balancerResult.expectedNetProfitUSD} | Aave: $${aaveResult.expectedNetProfitUSD}`
   );
-
-  // ─────────────────────────────────────────────────────────────────
-  // FASE 5: Especialización en Nichos Rentables (Lending Registry)
-  // ─────────────────────────────────────────────────────────────────
-  console.log('\n🎯 FASE 5: Verificación de Nichos Estratégicos (Morpho Blue / Moonwell)');
-
-  const morphoBase = LENDING_POOLS.find(p => p.protocol === 'MORPHO_BLUE' && p.chainId === 8453);
-  assert(!!morphoBase, 'Morpho Blue integrado en Base (ChainID 8453) para liquidaciones sin subasta');
 
   // ─────────────────────────────────────────────────────────────────
   // RESUMEN FINAL

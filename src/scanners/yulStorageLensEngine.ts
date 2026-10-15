@@ -8,8 +8,8 @@ import { logger } from '../utils/logger';
  * Reduce la latencia de escaneo de 369ms a < 90ms.
  */
 
-// Bytecode Yul ultra-compacto inyectable en eth_call vía state_override
-export const YUL_LENS_BYTECODE = '0x608060405234801561001057600080fd5b506004361061002b5760003560e01c8063...';
+// Bytecode Yul placeholder para inyección opcional vía state_override en nodos compatibles
+export const YUL_LENS_BYTECODE = '0x';
 
 export interface StorageSlotPoolResult {
   poolAddress: string;

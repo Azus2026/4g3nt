@@ -7,6 +7,7 @@ module.exports = {
     version: "0.8.24",
     settings: {
       viaIR: true,
+      evmVersion: "paris",
       optimizer: {
         enabled: true,
         runs: 1000,
@@ -21,7 +22,7 @@ module.exports = {
       },
     },
     base: {
-      url: "https://developer-access-mainnet.base.org",
+      url: process.env.BASE_RPC_URL || "https://mainnet.base.org",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },
     arbitrum: {

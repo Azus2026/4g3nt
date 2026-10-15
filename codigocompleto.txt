@@ -1,7 +1,7 @@
 ===============================================================================
   SISTEMA COMPLETO DE ARBITRAJE MEV CON FLASH LOANS (ARBITRUM & BASE)
   CÓDIGO FUENTE AUDITADO, ESTRUCTURADO Y CORREGIDO (FASES 1 A 5 COMPLETADAS)
-  Fecha de Generación: 2026-10-15T23:20:33.779Z
+  Fecha de Generación: 2026-10-15T23:50:57.139Z
 ===============================================================================
 
 ÍNDICE GENERAL DE ARCHIVOS INCLUIDOS:
@@ -1198,6 +1198,7 @@ module.exports = {
     version: "0.8.24",
     settings: {
       viaIR: true,
+      evmVersion: "paris",
       optimizer: {
         enabled: true,
         runs: 1000,
@@ -1212,7 +1213,7 @@ module.exports = {
       },
     },
     base: {
-      url: "https://developer-access-mainnet.base.org",
+      url: process.env.BASE_RPC_URL || "https://mainnet.base.org",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },
     arbitrum: {
@@ -1244,8 +1245,8 @@ export const ENV = {
   rpcUrl: process.env.BASE_RPC_URL || process.env.RPC_URL || 'https://developer-access-mainnet.base.org',
   arbitrumRpcUrl: process.env.ARBITRUM_RPC_URL || 'https://arb1.arbitrum.io/rpc',
   port: parseInt(process.env.PORT || '3000', 10),
-  arbitrageContractBase: process.env.ARBITRAGE_CONTRACT_BASE || '0xdA593D75439364a864a92416430FFA1268724059',
-  arbitrageContractArbitrum: process.env.ARBITRAGE_CONTRACT_ARBITRUM || '0xfD164F1b738FE3594C33A569Aa4F21D1855A47E2',
+  arbitrageContractBase: process.env.ARBITRAGE_CONTRACT_BASE || '0xD4A284DC95C17f981b7BaDD4b31Ae5Ae89854018',
+  arbitrageContractArbitrum: process.env.ARBITRAGE_CONTRACT_ARBITRUM || '0xD4A284DC95C17f981b7BaDD4b31Ae5Ae89854018',
   arbitrumWssUrl: process.env.ARBITRUM_WSS_URL || 'wss://arb1-feed.arbitrum.io/feed',
   baseWssUrl: process.env.BASE_WSS_URL || 'wss://base-rpc.publicnode.com',
 };
@@ -7383,11 +7384,11 @@ export const SERVER_STATS = {
   activeRegimentsCount: 10000,
 
   spotBase: {
-    wallet: '0x00Ae5b5dC1F52aF53B75edb4eB540DA0121D08aA',
-    balanceWETH: '0.014497',
-    balanceUSD: 35.88,
-    nativeGasETH: '0.000994',
-    minTargetUSD: 0.0001,
+    wallet: '0xf6Bb92Ac612D814F2A1e67Bf713F2f732419AC87',
+    balanceWETH: '0.000000',
+    balanceUSD: 25.00,
+    nativeGasETH: '0.009901',
+    minTargetUSD: 0.25,
     tokensTracked: 100,
     triangularCycles: 17100,
     scansCount: 0,

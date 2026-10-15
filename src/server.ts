@@ -75,11 +75,11 @@ export const SERVER_STATS = {
   activeRegimentsCount: 10000,
 
   spotBase: {
-    wallet: '0x00Ae5b5dC1F52aF53B75edb4eB540DA0121D08aA',
-    balanceWETH: '0.014497',
-    balanceUSD: 35.88,
-    nativeGasETH: '0.000994',
-    minTargetUSD: 0.0001,
+    wallet: '0xf6Bb92Ac612D814F2A1e67Bf713F2f732419AC87',
+    balanceWETH: '0.000000',
+    balanceUSD: 25.00,
+    nativeGasETH: '0.009901',
+    minTargetUSD: 0.25,
     tokensTracked: 100,
     triangularCycles: 17100,
     scansCount: 0,

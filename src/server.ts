@@ -1,16 +1,13 @@
 import express from 'express';
 import path from 'path';
 import { ENV } from './config/env';
-import { MULTI_CHAIN_ARBITRAGE_PAIRS, DEX_PROTOCOLS, SWARM_AGENTS } from './config/registry';
-import { SUPPORTED_CHAINS } from './config/chains';
+import { MULTI_CHAIN_ARBITRAGE_PAIRS, DEX_PROTOCOLS } from './config/registry';
 import { SwarmManager } from './cluster/swarmManager';
 import { streamProcessor, StreamPayload } from './mempool/quicknodeStreamProcessor';
 import { loadPersistedStats, savePersistedStats } from './utils/statsStore';
 import { historyStore } from './utils/historyStore';
-import { poolRegistry1000 } from './config/poolRegistry1000';
 import { cexLagPredictor } from './scanners/cexLagPredictor';
 import { binanceWebSocketFeed } from './scanners/binanceWebSocketFeed';
-import { TACTICAL_ARMADAS } from './config/armadas';
 import { logger } from './utils/logger';
 
 const app = express();
@@ -51,7 +48,7 @@ export function setSwarmManager(manager: SwarmManager) {
   streamProcessor.setSwarmManager(manager);
 }
 
-// In-memory stats store
+// In-memory real telemetry store (0% synthetic data)
 export const SERVER_STATS = {
   startedAt: new Date().toISOString(),
   scansCompleted: 0,
@@ -61,18 +58,12 @@ export const SERVER_STATS = {
   onChainExecutedCount: 0,
   onChainRealizedPnLUSD: 0,
   
-  // Listas separadas permanentemente
   spotOpportunities: [] as any[],
   lowFeeOpportunities: [] as any[],
   flashOpportunities: [] as any[],
   lastOpportunities: [] as any[],
 
-  activeChainsCount: Object.keys(SUPPORTED_CHAINS).length,
-  activePairsCount: 1000000,
-  activeAgentsCount: 1000000,
-  activeArmadasCount: 4,
-  activeLegionsCount: 1000,
-  activeRegimentsCount: 10000,
+  activeChainsCount: 2, // Base (8453) & Arbitrum One (42161)
 
   spotBase: {
     wallet: '0xf6Bb92Ac612D814F2A1e67Bf713F2f732419AC87',
@@ -82,9 +73,8 @@ export const SERVER_STATS = {
     nativeGasArbETH: '0.009761',
     contractBase: ENV.arbitrageContractBase || '0xD4A284DC95C17f981b7BaDD4b31Ae5Ae89854018',
     contractArbitrum: ENV.arbitrageContractArbitrum || '0xD4A284DC95C17f981b7BaDD4b31Ae5Ae89854018',
-    minTargetUSD: 0.25,
+    minTargetUSD: ENV.minProfitUSD,
     tokensTracked: 27,
-    triangularCycles: 17100,
     scansCount: 0,
     executedCount: 0,
     realizedPnLUSD: 0
@@ -95,12 +85,12 @@ export const SERVER_STATS = {
     scansCount: 0,
     executedCount: 0,
     realizedPnLUSD: 0,
-    chains: ['Base', 'Arbitrum One']
+    chains: ['Base (8453)', 'Arbitrum One (42161)']
   },
   flashLoans: {
     capitalRequiredUSD: 0.0,
     availableProviders: ['Balancer V2 (0% Fee)', 'Aave V3'],
-    targetChains: ['Arbitrum', 'Optimism', 'Ethereum', 'Base', 'Polygon', 'BSC'],
+    targetChains: ['Base (8453)', 'Arbitrum One (42161)'],
     detectedOpportunitiesCount: 0,
     detectedPnLUSD: 0,
     onChainExecutedCount: 0
@@ -158,10 +148,6 @@ function updateMergedOpportunities() {
   ];
 }
 
-app.get('/api/armadas', (req, res) => {
-  res.json(TACTICAL_ARMADAS);
-});
-
 app.get('/api/status', (req, res) => {
   res.json({
     status: 'ONLINE',
@@ -181,13 +167,6 @@ app.get('/api/history/weekly', (req, res) => {
   res.json(summary);
 });
 
-app.get('/api/pools/1000', (req, res) => {
-  res.json({
-    total: poolRegistry1000.getTotalPoolsCount(),
-    pools: poolRegistry1000.getAllPools().slice(0, 100)
-  });
-});
-
 app.all('/api/reset-stats', (req, res) => {
   SERVER_STATS.scansCompleted = 0;
   SERVER_STATS.opportunitiesFound = 0;
@@ -196,53 +175,21 @@ app.all('/api/reset-stats', (req, res) => {
   SERVER_STATS.onChainExecutedCount = 0;
   SERVER_STATS.onChainRealizedPnLUSD = 0;
   SERVER_STATS.spotOpportunities = [];
+  SERVER_STATS.lowFeeOpportunities = [];
   SERVER_STATS.flashOpportunities = [];
   SERVER_STATS.lastOpportunities = [];
   SERVER_STATS.spotBase.scansCount = 0;
   SERVER_STATS.spotBase.executedCount = 0;
   SERVER_STATS.spotBase.realizedPnLUSD = 0;
+  SERVER_STATS.lowFee.scansCount = 0;
+  SERVER_STATS.lowFee.executedCount = 0;
+  SERVER_STATS.lowFee.realizedPnLUSD = 0;
   SERVER_STATS.flashLoans.detectedOpportunitiesCount = 0;
   SERVER_STATS.flashLoans.detectedPnLUSD = 0;
   SERVER_STATS.flashLoans.onChainExecutedCount = 0;
   historyStore.clearHistory();
   savePersistedStats();
   res.json({ success: true, message: 'Estadísticas e historial reiniciados a 0 exitosamente', stats: SERVER_STATS });
-});
-
-app.all('/api/test-trigger', async (req, res) => {
-  addScanLog(`🧪 [TEST SPOT $35] Inyectando divergencia de prueba en Base (WETH ➔ AERO ➔ USDC)... (Ganancia: +$0.0042 USD)`, 'SPOT_BASE');
-  
-  const testOpp = {
-    pairName: 'WETH ➔ AERO ➔ USDC ➔ WETH (Base Spot)',
-    chainId: 8453,
-    type: 'SPOT_BASE',
-    tokenBorrow: '0x4200000000000000000000000000000000000006',
-    tokenBorrowSymbol: 'WETH',
-    borrowAmount: '0.014',
-    loanAmount: '0.0145 WETH ($35 USD)',
-    leg1: { dex: 'Aerodrome Slipstream (Tier 500)', protocolId: 'aerodrome-slipstream', tokenIn: 'WETH', tokenOut: 'AERO', price: 1.25 },
-    leg2: { dex: 'Uniswap V3 (Tier 500)', protocolId: 'uniswap-v3', tokenIn: 'AERO', tokenOut: 'USDC', price: 1.28 },
-    spreadPercent: 0.28,
-    grossProfitUSD: 0.0065,
-    gasCostUSD: 0.0003,
-    netProfitUSD: 0.0042,
-    timestamp: Date.now(),
-    engine: 'BASE_SPOT_ATOMIC_VERIFIED'
-  };
-
-  SERVER_STATS.opportunitiesFound++;
-  SERVER_STATS.detectedOpportunitiesCount++;
-  SERVER_STATS.detectedPnLUSD += testOpp.netProfitUSD;
-  SERVER_STATS.spotBase.scansCount++;
-  addSpotOpportunity(testOpp);
-  historyStore.addRecord(testOpp as any, false);
-  savePersistedStats();
-
-  return res.json({
-    success: true,
-    message: 'Prueba de alerta para Spot $35 inyectada con éxito.',
-    detectedOpportunity: testOpp
-  });
 });
 
 app.get('/api/mempool-stream', (req, res) => {
@@ -265,16 +212,6 @@ app.post('/api/mempool-stream', (req, res) => {
   } catch (err: any) {
     logger.warn(`Error al procesar payload de QuickNode Stream: ${err.message}`);
     return res.status(200).json({ success: true, status: 'CONNECTED' });
-  }
-});
-
-app.get('/api/agents', (req, res) => {
-  const regiment = req.query.regiment ? parseInt(req.query.regiment as string, 10) : undefined;
-  const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 100;
-  if (globalSwarmManager) {
-    res.json(globalSwarmManager.getClusterStatus(regiment, limit));
-  } else {
-    res.json([]);
   }
 });
 

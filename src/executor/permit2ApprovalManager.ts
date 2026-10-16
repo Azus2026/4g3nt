@@ -25,11 +25,6 @@ const TARGET_TOKENS_BY_CHAIN: Record<number, Array<{ symbol: string; address: st
     { symbol: 'WETH', address: '0x4200000000000000000000000000000000000006' },
     { symbol: 'USDC', address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' },
     { symbol: 'AERO', address: '0x940181a94A35A4569E4529A3CDfB74e38FD98631' }
-  ],
-  10: [
-    { symbol: 'WETH', address: '0x4200000000000000000000000000000000000006' },
-    { symbol: 'USDC', address: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85' },
-    { symbol: 'OP', address: '0x4200000000000000000000000000000000000042' }
   ]
 };
 

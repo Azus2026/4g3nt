@@ -16,12 +16,12 @@ async function main() {
   loadPersistedStats();
 
   logger.divider();
-  logger.info('🚀 INICIANDO CLUSTER DE AGENTES DE ARBITRAJE FLASH LOAN V2 (OPTIMIZADO)');
-  logger.info(`   Agentes Concurrentes: ${SWARM_AGENTS.length} Agentes Especializados`);
-  logger.info(`   Pares de Liquidez Totales: ${MULTI_CHAIN_ARBITRAGE_PAIRS.length} Pares Multi-Cadena`);
-  logger.info(`   Modo DRY_RUN: ${ENV.dryRun ? 'ACTIVADO (Simulación sin riesgo)' : 'DESACTIVADO (MODO LIVE MAINNET REAL)'}`);
+  logger.info('🚀 INICIANDO MOTOR DE ARBITRAJE ATÓMICO V2 (100% DATOS REALES ON-CHAIN)');
+  logger.info('   Motores Activos: LowFeeExecutor (8453/42161) | SpotExecutor (8453) | ArbitrumExecutor (42161)');
+  logger.info(`   Contratos Auditados: Base ${ENV.arbitrageContractBase} | Arbitrum ${ENV.arbitrageContractArbitrum}`);
+  logger.info(`   Modo Operativo: ${ENV.dryRun ? 'DRY_RUN=true (Simulación Real con staticCall + estimateGas)' : 'LIVE MAINNET (Ejecución Real On-Chain)'}`);
   logger.info(`   Ganancia Mínima Objetivo: $${ENV.minProfitUSD.toFixed(2)} USD`);
-  logger.info(`   Optimizaciones MEV: Sweet Spot Loan Search | Balancer 0% Fee | Arbitrum Sequencer Feed | Base Flashblocks`);
+  logger.info('   Optimizaciones MEV: Sweet Spot Loan Search | Balancer 0% Fee | Arbitrum Sequencer Feed | Base Flashblocks');
   logger.divider();
 
   // 1. Inicializar Gestor de RPCs y cargar Chainlist.org

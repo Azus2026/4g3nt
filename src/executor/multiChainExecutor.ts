@@ -4,8 +4,10 @@ import { ProtocolinkClient, ArbitrageOpportunity, DEXQuote } from '../protocolin
 import { TokenConfig } from '../config/registry';
 import { TriangularOpportunity } from '../triangular/triangularScanner';
 import { RPCManager } from '../providers/rpcManager';
-import { addScanLog } from '../server';
+import { addScanLog, SERVER_STATS } from '../server';
+import { executionLedger } from '../utils/executionLedger';
 import { logger } from '../utils/logger';
+import { transactionDispatcher } from '../services/transactionDispatcher';
 
 const FLASHBOTS_RPC_MAP: Record<number, string> = {
   1: 'https://rpc.flashbots.net',
@@ -66,7 +68,20 @@ export class MultiChainExecutor {
         return false;
       }
 
-      return await this.broadcastTransaction(opportunity.chainId, opportunity.pairName, wallet, provider, routerData);
+      return await this.broadcastTransaction(
+        opportunity.chainId,
+        opportunity.pairName,
+        wallet,
+        provider,
+        routerData,
+        {
+          loanTokenSymbol: opportunity.tokenA?.symbol || 'WETH',
+          loanAmount: opportunity.flashLoanAmount,
+          grossProfitUSD: opportunity.grossProfitUSD || opportunity.netProfitUSD,
+          gasUSD: opportunity.estimatedGasUSD || 0.002,
+          netProfitUSD: opportunity.netProfitUSD || 0,
+        }
+      );
     } finally {
       this.executingChains.delete(opportunity.chainId);
     }
@@ -102,7 +117,20 @@ export class MultiChainExecutor {
       return false;
     }
 
-    return this.broadcastTransaction(opportunity.chainId, opportunity.cycleName, wallet, provider, routerData);
+    return this.broadcastTransaction(
+      opportunity.chainId,
+      opportunity.cycleName,
+      wallet,
+      provider,
+      routerData,
+      {
+        loanTokenSymbol: opportunity.tokenA?.symbol || 'WETH',
+        loanAmount: opportunity.flashLoanAmount,
+        grossProfitUSD: opportunity.grossProfitUSD || opportunity.netProfitUSD,
+        gasUSD: opportunity.estimatedGasUSD || 0.002,
+        netProfitUSD: opportunity.netProfitUSD || 0,
+      }
+    );
   }
 
   private async broadcastTransaction(
@@ -110,7 +138,14 @@ export class MultiChainExecutor {
     tradeName: string,
     wallet: ethers.Wallet | null,
     provider: any,
-    routerData: any
+    routerData: any,
+    meta?: {
+      loanTokenSymbol: string;
+      loanAmount: string;
+      grossProfitUSD: number;
+      gasUSD: number;
+      netProfitUSD: number;
+    }
   ): Promise<boolean> {
     const toAddress = String(routerData.to);
     const dataHex = String(routerData.data);
@@ -118,7 +153,7 @@ export class MultiChainExecutor {
 
     logger.info(`Router Payload generado -> To: ${toAddress} | Data length: ${dataHex.length} bytes | Value: ${valueHex}`);
 
-    // 2. Simulación en modo DRY_RUN (eth_call atómico)
+    // 2. Simulación en modo DRY_RUN (eth_call atómico - NUNCA se contabiliza como operación minada)
     if (ENV.dryRun) {
       logger.warn(`[DRY-RUN SIMULACIÓN] Ejecutando prueba eth_call en ChainID ${chainId}...`);
       try {
@@ -129,9 +164,25 @@ export class MultiChainExecutor {
           from: wallet ? wallet.address : '0x0000000000000000000000000000000000000001',
         };
         await provider.call(txRequest);
-        logger.success(`✅ [SIMULACIÓN EXITOSA] eth_call simulado sin reversión en bloque actual.`);
+        const simNet = meta?.netProfitUSD || 0;
+        SERVER_STATS.simulatedExecutedCount++;
+        SERVER_STATS.simulatedPnLUSD += simNet;
+        SERVER_STATS.flashLoans.simulatedCount++;
+        SERVER_STATS.flashLoans.simulatedPnLUSD += simNet;
+        executionLedger.recordSimulation({
+          chainId,
+          pairName: tradeName,
+          provider: 'protocolink',
+          loanTokenSymbol: meta?.loanTokenSymbol || 'WETH',
+          loanAmount: meta?.loanAmount || '0',
+          simulatedGrossProfitUSD: meta?.grossProfitUSD || simNet,
+          simulatedGasUSD: meta?.gasUSD || 0.002,
+          simulatedNetProfitUSD: simNet,
+          notes: 'Protocolink DRY_RUN eth_call verified',
+        });
+        logger.success(`✅ [SIMULACIÓN EXITOSA] eth_call simulado sin reversión en bloque actual (Registrado en Ledger Simulado).`);
         addScanLog(`✅ [SIMULACIÓN OK] ${tradeName} validado sin reversión.`);
-        return true;
+        return false;
       } catch (err: any) {
         logger.error(`❌ [SIMULACIÓN FALLIDA] Reversión detectada en eth_call: ${err.message}`);
         addScanLog(`❌ [SIMULACIÓN REVERTIDA] ${tradeName}: ${err.message}`);
@@ -145,7 +196,7 @@ export class MultiChainExecutor {
       return false;
     }
 
-    return executeWithNonceLock(chainId, async () => {
+    return transactionDispatcher.executeWithChainLock(chainId, async () => {
       try {
         // 1. Pre-Flight Simulation Obligatorio: Validar eth_call en el nodo antes de enviar
         try {
@@ -179,6 +230,17 @@ export class MultiChainExecutor {
         }
 
         const feeData = await provider.getFeeData();
+        const gasPriceGwei = feeData.gasPrice ? Number(feeData.gasPrice) / 1e9 : 0.05;
+        const estimatedGasEth = (Number(gasLimit) * gasPriceGwei) / 1e9;
+
+        // Guardia de Límite Diario de Gas
+        const gasGuard = executionLedger.canSpendGas(estimatedGasEth, ENV.maxDailyGasEth, chainId);
+        if (!gasGuard.allowed) {
+          logger.error(`🛑 [GAS GUARD] Límite diario de gas alcanzado (${gasGuard.spentSoFar.toFixed(6)} ETH / máx: ${gasGuard.maxAllowed.toFixed(6)} ETH). Abortando en Chain ${chainId}.`);
+          addScanLog(`🛑 [GAS GUARD] Límite diario de gas alcanzado (${gasGuard.spentSoFar.toFixed(6)} ETH). Despacho bloqueado.`);
+          return false;
+        }
+
         const txPayload: any = {
           to: toAddress,
           data: dataHex,
@@ -195,7 +257,7 @@ export class MultiChainExecutor {
           txPayload.gasPrice = (BigInt(feeData.gasPrice) * 12n) / 10n;
         }
 
-        const nonce = await inMemoryNonceManager.getNextNonce(wallet, chainId);
+        const nonce = await transactionDispatcher.getNextNonce(wallet, chainId);
         txPayload.nonce = nonce;
 
         const tx = await wallet.sendTransaction(txPayload);
@@ -218,13 +280,13 @@ export class MultiChainExecutor {
           addScanLog(`🎉 [CONFIRMADA] Arbitraje Ejecutado Bloque #${receipt.blockNumber} | Explorer: ${explorerUrl}`);
           return true;
         } else {
-          inMemoryNonceManager.resetNonce(chainId);
+          transactionDispatcher.resetNonce(chainId);
           logger.error(`Transacción revertida en bloque #${receipt?.blockNumber || 'desconocido'}.`);
           addScanLog(`❌ Transacción de arbitraje revertida.`);
           return false;
         }
       } catch (err: any) {
-        inMemoryNonceManager.resetNonce(chainId);
+        transactionDispatcher.resetNonce(chainId);
         logger.error(`Error en ejecución live: ${err.message}`);
         addScanLog(`❌ Error en transmisión live: ${err.message}`);
         return false;
@@ -282,41 +344,5 @@ export class MultiChainExecutor {
     } finally {
       this.executingChains.delete(chainId);
     }
-  }
-}
-
-class InMemoryNonceManager {
-  private chainNonces: Map<number, number> = new Map();
-
-  async getNextNonce(wallet: ethers.Wallet, chainId: number): Promise<number> {
-    const cached = this.chainNonces.get(chainId);
-    const onChainCount = await wallet.getNonce('pending');
-    const nonceToUse = cached !== undefined && cached >= onChainCount ? cached : onChainCount;
-    this.chainNonces.set(chainId, nonceToUse + 1);
-    return nonceToUse;
-  }
-
-  resetNonce(chainId: number) {
-    this.chainNonces.delete(chainId);
-  }
-}
-
-const inMemoryNonceManager = new InMemoryNonceManager();
-
-const chainNonceLocks: Record<number, Promise<void>> = {};
-
-async function executeWithNonceLock<T>(chainId: number, fn: () => Promise<T>): Promise<T> {
-  const currentLock = chainNonceLocks[chainId] || Promise.resolve();
-  let release: () => void = () => {};
-  const nextLock = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  chainNonceLocks[chainId] = currentLock.then(() => nextLock);
-
-  try {
-    await currentLock;
-    return await fn();
-  } finally {
-    release();
   }
 }

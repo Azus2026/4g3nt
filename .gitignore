@@ -9,3 +9,4 @@ typechain-types/
 *.tar.gz
 *.tar
 *.zip
+scratch/

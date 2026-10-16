@@ -350,10 +350,10 @@ function getProtocolFeeRate(protocolId: string): number {
           });
         }
 
-        // 2. Ejecución directa standalone Flash Loan
+        // 2. Ejecución directa standalone Flash Loan (0% Capital Propio)
         if (netProfitUSD >= ENV.minProfitUSD) {
-          this.executor.execute(opp).then((executed) => {
-            if (executed) {
+          this.executor.execute(opp).then((executedOnChain) => {
+            if (executedOnChain && !ENV.dryRun) {
               SERVER_STATS.onChainExecutedCount++;
               SERVER_STATS.onChainRealizedPnLUSD += netProfitUSD;
               savePersistedStats();
@@ -361,14 +361,6 @@ function getProtocolFeeRate(protocolId: string): number {
               telegramNotifier.notifyExecution(opp, this.definition.name).catch(() => {});
             }
           }).catch(() => {});
-        }
-
-        // 3. Ejecución SPOT con Capital Propio en Base (Chain 8453)
-        if (pair.chainId === 8453) {
-          try {
-            const { spotExecutor } = require('../executor/spotExecutor');
-            spotExecutor.executeSpot(opp).catch(() => {});
-          } catch {}
         }
       }
     }

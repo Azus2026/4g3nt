@@ -3,6 +3,7 @@ import { ENV } from '../config/env';
 import { logger } from '../utils/logger';
 import { SERVER_STATS, addScanLog, addFlashOpportunity } from '../server';
 import { savePersistedStats } from '../utils/statsStore';
+import { executionLedger } from '../utils/executionLedger';
 import { SweetSpotOptimizer } from '../math/sweetSpotOptimizer';
 import { cexLagPredictor } from '../scanners/cexLagPredictor';
 
@@ -295,11 +296,24 @@ export class ArbitrumExecutor {
           logger.info(`🧪 [DRY RUN VALIDADO ARBITRUM] Flash Loan ${providerName} en ${pairName} | Spread: ${formattedSpread}% | Net: +$${netUSD} USD. Omitiendo tx real.`);
           addScanLog(`🧪 [DRY RUN ARBITRUM] Oportunidad validada en ${pairName} (Net: +$${netUSD} USD).`, 'FLASH_LOAN');
           this.consecutiveErrors = 0;
-          SERVER_STATS.flashLoans.onChainExecutedCount++;
+          SERVER_STATS.simulatedExecutedCount++;
+          SERVER_STATS.simulatedPnLUSD += netUSD;
+          SERVER_STATS.flashLoans.simulatedCount++;
+          SERVER_STATS.flashLoans.simulatedPnLUSD += netUSD;
           SERVER_STATS.flashLoans.detectedPnLUSD += netUSD;
+          executionLedger.recordSimulation({
+            chainId: 42161,
+            pairName: `${pairName} (Arbitrum)`,
+            provider: isBalancer ? 'balancer' : 'aave',
+            loanTokenSymbol: 'WETH',
+            loanAmount: ethers.formatEther(profitableFlashAmount),
+            simulatedGrossProfitUSD: grossUSD,
+            simulatedGasUSD: arbGasEst.totalGasUSD,
+            simulatedNetProfitUSD: netUSD,
+          });
           savePersistedStats();
           this.isExecuting = false;
-          return true;
+          return false;
         }
 
         addScanLog(`🚀 [DISPARO ON-CHAIN ARBITRUM] ${pairName} (${pathDesc})...`, 'FLASH_LOAN');
@@ -311,13 +325,31 @@ export class ArbitrumExecutor {
         logger.info(`⚡ Tx Enviada a Arbitrum: https://arbiscan.io/tx/${tx.hash}`);
         const receipt = await tx.wait(1);
 
+        const ledgerEntry = executionLedger.recordMinedTransaction({
+          chainId: 42161,
+          pairName: `${pairName} (Arbitrum)`,
+          provider: isBalancer ? 'balancer' : 'aave',
+          loanTokenSymbol: 'WETH',
+          loanTokenDecimals: 18,
+          loanTokenPriceUSD: ethPrice,
+          loanAmount: ethers.formatEther(profitableFlashAmount),
+          ethPriceUSD: ethPrice,
+          simulatedGrossProfitUSD: grossUSD,
+          simulatedGasUSD: arbGasEst.totalGasUSD,
+          simulatedNetProfitUSD: netUSD,
+          receipt,
+        });
+
         if (receipt && receipt.status === 1) {
           logger.success(`🎉 [ARBITRUM CONFIRMADO] Bloque #${receipt.blockNumber}!`);
           addScanLog(`🎉 [CONFIRMADA] Flash Loan Arbitrum Bloque #${receipt.blockNumber} | Tx: https://arbiscan.io/tx/${tx.hash}`, 'FLASH_LOAN');
 
+          const realizedUSD = ledgerEntry.realizedNetProfitUSD ?? netUSD;
           this.consecutiveErrors = 0;
+          SERVER_STATS.onChainExecutedCount++;
+          SERVER_STATS.onChainRealizedPnLUSD += realizedUSD;
           SERVER_STATS.flashLoans.onChainExecutedCount++;
-          SERVER_STATS.flashLoans.detectedPnLUSD += netUSD;
+          SERVER_STATS.flashLoans.detectedPnLUSD += realizedUSD;
           savePersistedStats();
           this.isExecuting = false;
           return true;
@@ -456,11 +488,24 @@ export class ArbitrumExecutor {
           logger.info(`🧪 [DRY RUN VALIDADO ARBITRUM] Flash Loan Triangular ${providerName} en ${pairName} | Spread: ${formattedTriSpread}% | Net: +$${triNetUSD} USD. Omitiendo tx real.`);
           addScanLog(`🧪 [DRY RUN ARBITRUM] Triangular validado en ${pairName} (Net: +$${triNetUSD} USD).`, 'FLASH_LOAN');
           this.consecutiveErrors = 0;
-          SERVER_STATS.flashLoans.onChainExecutedCount++;
+          SERVER_STATS.simulatedExecutedCount++;
+          SERVER_STATS.simulatedPnLUSD += triNetUSD;
+          SERVER_STATS.flashLoans.simulatedCount++;
+          SERVER_STATS.flashLoans.simulatedPnLUSD += triNetUSD;
           SERVER_STATS.flashLoans.detectedPnLUSD += triNetUSD;
+          executionLedger.recordSimulation({
+            chainId: 42161,
+            pairName: `[3-LEG] ${pairName} (Arbitrum)`,
+            provider: isBalancer ? 'balancer' : 'aave',
+            loanTokenSymbol: 'WETH',
+            loanAmount: ethers.formatEther(profitableFlashAmount),
+            simulatedGrossProfitUSD: triGrossUSD,
+            simulatedGasUSD: triGasEst.totalGasUSD,
+            simulatedNetProfitUSD: triNetUSD,
+          });
           savePersistedStats();
           this.isExecuting = false;
-          return true;
+          return false;
         }
 
         const tx = isBalancer
@@ -468,11 +513,29 @@ export class ArbitrumExecutor {
           : await this.arbitrageContract.executeFlashLoanTriangular(routeStruct, profitableFlashAmount, { gasLimit });
 
         const receipt = await tx.wait(1);
+        const ledgerEntry = executionLedger.recordMinedTransaction({
+          chainId: 42161,
+          pairName: `[3-LEG] ${pairName} (Arbitrum)`,
+          provider: isBalancer ? 'balancer' : 'aave',
+          loanTokenSymbol: 'WETH',
+          loanTokenDecimals: 18,
+          loanTokenPriceUSD: triEthPrice,
+          loanAmount: ethers.formatEther(profitableFlashAmount),
+          ethPriceUSD: triEthPrice,
+          simulatedGrossProfitUSD: triGrossUSD,
+          simulatedGasUSD: triGasEst.totalGasUSD,
+          simulatedNetProfitUSD: triNetUSD,
+          receipt,
+        });
+
         if (receipt && receipt.status === 1) {
           logger.success(`🎉 [TRIANGULAR ARBITRUM CONFIRMADO] Bloque #${receipt.blockNumber}!`);
+          const realizedUSD = ledgerEntry.realizedNetProfitUSD ?? triNetUSD;
           this.consecutiveErrors = 0;
+          SERVER_STATS.onChainExecutedCount++;
+          SERVER_STATS.onChainRealizedPnLUSD += realizedUSD;
           SERVER_STATS.flashLoans.onChainExecutedCount++;
-          SERVER_STATS.flashLoans.detectedPnLUSD += triNetUSD;
+          SERVER_STATS.flashLoans.detectedPnLUSD += realizedUSD;
           savePersistedStats();
           this.isExecuting = false;
           return true;

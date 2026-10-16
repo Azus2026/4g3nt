@@ -1,6 +1,7 @@
 import { multicallBatchScanner, PoolCallItem, PoolStateResult } from './multicallBatchScanner';
 import { poolRegistry1000 } from '../config/poolRegistry1000';
 import { SUPPORTED_CHAINS } from '../config/chains';
+import { ENV } from '../config/env';
 import { logger } from '../utils/logger';
 
 export interface FastQuoteData {
@@ -36,7 +37,7 @@ export class SharedPoolStateEngine {
     this.isRefreshing = true;
 
     try {
-      const chainIds = [42161, 8453, 10, 137, 56, 1];
+      const chainIds = ENV.enableArbitrum ? [8453, 42161] : [8453];
 
       const chainPromises = chainIds.map(async (chainId) => {
         try {

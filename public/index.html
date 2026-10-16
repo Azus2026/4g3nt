@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Protocolink AI Swarm V2 | Separación Spot $35 vs Flash Loans</title>
+  <title>Flash Loan MEV Engine — Base Mainnet (0% Principal / Pure Gas ETH)</title>
 
   <!-- Google Fonts & Lucide Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -19,7 +19,7 @@
       --border-color: rgba(255, 255, 255, 0.08);
       --accent-cyan: #00f2fe;
       --accent-blue: #4facfe;
-      --accent-purple: #7f00ff;
+      --accent-purple: #a855f7;
       --accent-green: #10b981;
       --accent-yellow: #f59e0b;
       --accent-red: #ef4444;
@@ -39,7 +39,7 @@
     }
 
     header {
-      background: rgba(15, 21, 35, 0.9);
+      background: rgba(15, 21, 35, 0.92);
       backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border-color);
       padding: 1rem 2rem;
@@ -49,15 +49,17 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
     }
 
-    .brand { display: flex; align-items: center; gap: 0.75rem; }
+    .brand { display: flex; align-items: center; gap: 0.85rem; }
 
     .brand-icon {
-      width: 42px; height: 42px; border-radius: 12px;
+      width: 44px; height: 44px; border-radius: 12px;
       background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
       display: flex; align-items: center; justify-content: center;
-      color: #fff; box-shadow: 0 0 20px rgba(0, 242, 254, 0.3);
+      color: #fff; box-shadow: 0 0 20px rgba(0, 242, 254, 0.35);
     }
 
     .brand-title {
@@ -67,15 +69,15 @@
     }
 
     .brand-subtitle {
-      font-size: 0.75rem; color: var(--accent-cyan);
+      font-size: 0.72rem; color: var(--accent-cyan);
       text-transform: uppercase; letter-spacing: 1px; font-weight: 600;
     }
 
-    .header-badges { display: flex; align-items: center; gap: 0.75rem; }
+    .header-badges { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
 
     .badge {
-      display: inline-flex; align-items: center; gap: 0.4rem;
-      padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.75rem;
+      display: inline-flex; align-items: center; gap: 0.45rem;
+      padding: 0.4rem 0.85rem; border-radius: 20px; font-size: 0.75rem;
       font-weight: 600; border: 1px solid var(--border-color);
       background: rgba(255, 255, 255, 0.03);
     }
@@ -90,128 +92,107 @@
       width: 100%; display: flex; flex-direction: column; gap: 2rem;
     }
 
-    /* Filter View Selector */
-    .filter-tabs {
-      display: flex; gap: 0.75rem; background: rgba(255, 255, 255, 0.03);
-      padding: 0.4rem; border-radius: 14px; border: 1px solid var(--border-color);
-      width: fit-content;
+    .telemetry-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;
+      background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(0, 242, 254, 0.25);
+      border-radius: 18px; padding: 1.25rem; box-shadow: 0 8px 30px rgba(0,0,0,0.4);
     }
 
-    .tab-btn {
-      background: transparent; border: none; color: var(--text-muted);
-      padding: 0.6rem 1.25rem; border-radius: 10px; font-weight: 600; font-size: 0.85rem;
-      cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 0.5rem;
+    .telemetry-card {
+      border-right: 1px solid rgba(255,255,255,0.06); padding-right: 0.75rem;
+      display: flex; flex-direction: column; gap: 0.25rem;
+    }
+    .telemetry-card:last-child { border-right: none; }
+
+    .telemetry-label {
+      font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);
+    }
+    .telemetry-value {
+      font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 700;
     }
 
-    .tab-btn.active.tab-spot {
-      background: rgba(16, 185, 129, 0.2); color: var(--accent-green);
-      border: 1px solid rgba(16, 185, 129, 0.5); box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
-    }
-
-    .tab-btn.active.tab-flash {
-      background: rgba(0, 242, 254, 0.2); color: var(--accent-cyan);
-      border: 1px solid rgba(0, 242, 254, 0.5); box-shadow: 0 0 15px rgba(0, 242, 254, 0.2);
-    }
-
-    .tab-btn.active.tab-all {
-      background: rgba(127, 0, 255, 0.2); color: #c084fc;
-      border: 1px solid rgba(127, 0, 255, 0.5);
-    }
-
-    /* Main Dual Command Panels */
-    .dual-command-grid {
+    /* Command Panels */
+    .command-grid {
       display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;
     }
-
     @media (max-width: 1024px) {
-      .dual-command-grid { grid-template-columns: 1fr; }
+      .command-grid { grid-template-columns: 1fr; }
     }
 
     .command-panel {
-      background: var(--bg-card); border-radius: 20px; padding: 1.75rem;
+      background: var(--bg-card); border-radius: 20px; padding: 1.5rem;
       border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 1.25rem;
-      position: relative; overflow: hidden;
-    }
-
-    .panel-spot {
-      border-color: rgba(16, 185, 129, 0.4);
-      background: linear-gradient(180deg, rgba(16, 185, 129, 0.05) 0%, rgba(15, 21, 35, 1) 100%);
-      box-shadow: 0 0 30px rgba(16, 185, 129, 0.08);
-    }
-
-    .panel-flash {
-      border-color: rgba(0, 242, 254, 0.4);
-      background: linear-gradient(180deg, rgba(0, 242, 254, 0.05) 0%, rgba(15, 21, 35, 1) 100%);
-      box-shadow: 0 0 30px rgba(0, 242, 254, 0.08);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
     }
 
     .panel-header {
       display: flex; justify-content: space-between; align-items: flex-start;
-      border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border-color); padding-bottom: 0.85rem;
     }
 
     .panel-title {
-      font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 700;
-      display: flex; align-items: center; gap: 0.6rem;
+      font-family: 'Outfit', sans-serif; font-size: 1.15rem; font-weight: 700;
+      display: flex; align-items: center; gap: 0.5rem;
     }
 
     .panel-metrics-grid {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.85rem;
     }
 
     .metric-box {
       background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);
-      border-radius: 14px; padding: 1rem; display: flex; flex-direction: column; gap: 0.3rem;
+      border-radius: 12px; padding: 0.85rem; display: flex; flex-direction: column; gap: 0.2rem;
     }
 
-    .metric-label { font-size: 0.75rem; color: var(--text-muted); }
-    .metric-value { font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; color: #fff; }
+    .metric-label { font-size: 0.7rem; color: var(--text-muted); }
+    .metric-value { font-family: 'Outfit', sans-serif; font-size: 1.05rem; font-weight: 700; color: #fff; }
 
-    /* Pairs and Opportunities Grid */
-    .pairs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.25rem; }
+    .terminal-card {
+      background: #060911; border: 1px solid var(--border-color);
+      border-radius: 12px; padding: 0.85rem; font-family: 'Fira Code', monospace; font-size: 0.72rem;
+      color: #94a3b8; height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.35rem;
+      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+    }
+    .terminal-line { word-break: break-all; line-height: 1.35; }
+
+    /* Opportunities Grid */
+    .pairs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.25rem; }
 
     .pair-card {
       background: var(--bg-card); border: 1px solid var(--border-color);
       border-radius: 16px; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.85rem;
       transition: transform 0.2s;
     }
-
-    .pair-card:hover { transform: translateY(-2px); border-color: rgba(255, 255, 255, 0.2); }
-
-    .pair-card.card-spot { border-left: 4px solid var(--accent-green); border-color: rgba(16, 185, 129, 0.3); }
-    .pair-card.card-lowfee { border-left: 4px solid #a855f7; border-color: rgba(168, 85, 247, 0.3); }
-    .pair-card.card-flash { border-left: 4px solid var(--accent-cyan); border-color: rgba(0, 242, 254, 0.3); }
+    .pair-card:hover { transform: translateY(-2px); border-color: rgba(0, 242, 254, 0.3); }
 
     .pair-type-pill {
       font-size: 0.65rem; font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 6px;
       text-transform: uppercase; letter-spacing: 0.5px; width: fit-content;
     }
 
-    .type-spot { background: rgba(16, 185, 129, 0.15); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.3); }
-    .type-lowfee { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
-    .type-flash { background: rgba(0, 242, 254, 0.15); color: var(--accent-cyan); border: 1px solid rgba(0, 242, 254, 0.3); }
-
-    .tab-lowfee.active { background: rgba(168, 85, 247, 0.2); color: #c084fc; border-color: #a855f7; }
-
-    /* Dual Terminal Consoles */
-    .terminal-card {
-      background: #060911; border: 1px solid var(--border-color);
-      border-radius: 14px; padding: 1rem; font-family: 'Fira Code', monospace; font-size: 0.75rem;
-      color: #94a3b8; height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem;
-      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+    /* Ledger Table */
+    .ledger-table-container {
+      background: var(--bg-card); border-radius: 18px; border: 1px solid var(--border-color);
+      padding: 1.25rem; overflow-x: auto;
     }
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    th { text-align: left; padding: 0.75rem 1rem; color: var(--text-muted); border-bottom: 1px solid var(--border-color); font-weight: 600; text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.5px; }
+    td { padding: 0.75rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    tr:hover { background: rgba(255, 255, 255, 0.02); }
 
-    .terminal-line { word-break: break-all; line-height: 1.4; }
-    .terminal-line.spot { color: #34d399; }
-    .terminal-line.lowfee { color: #c084fc; }
-    .terminal-line.flash { color: #38bdf8; }
+    .status-badge {
+      display: inline-block; padding: 0.2rem 0.55rem; border-radius: 6px; font-size: 0.68rem; font-weight: 700;
+    }
+    .status-simulated { background: rgba(250, 204, 21, 0.15); color: #facc15; border: 1px solid rgba(250, 204, 21, 0.3); }
+    .status-mined-success { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .status-mined-revert { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .status-sim-revert { background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
 
     .pulse-dot {
       width: 8px; height: 8px; border-radius: 50%; background-color: var(--accent-green);
       display: inline-block; box-shadow: 0 0 10px var(--accent-green);
       animation: pulse 1.5s infinite;
     }
-
     @keyframes pulse {
       0% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.4; transform: scale(1.2); }
@@ -224,278 +205,173 @@
   <header>
     <div class="brand">
       <div class="brand-icon">
-        <i data-lucide="layers"></i>
+        <i data-lucide="zap"></i>
       </div>
       <div>
-        <div class="brand-title">ARBITRAGE ENGINE V2 — BASE & ARBITRUM</div>
-        <div class="brand-subtitle">EJECUCIÓN ATÓMICA 100% ON-CHAIN • BALANCER V2 (0% FEE) & AAVE V3</div>
+        <div class="brand-title">FLASH LOAN MEV ENGINE — BASE MAINNET</div>
+        <div class="brand-subtitle">0% CAPITAL PROPIO • 100% PRÉSTAMOS FLASH (BALANCER V2 0% / AAVE V3) • GAS EN ETH</div>
       </div>
     </div>
     <div class="header-badges">
       <div class="badge badge-green">
         <span class="pulse-dot"></span>
-        NODO DUAL ACTIVO: BASE (8453) + ARBITRUM (42161)
+        BASE MAINNET (8453)
       </div>
       <div class="badge" id="badgeExecMode" style="background: rgba(250, 204, 21, 0.15); color: #facc15; border-color: rgba(250, 204, 21, 0.4);">
         <i data-lucide="shield-check" style="width: 14px;"></i>
         <span id="lblExecMode">MODO: SIMULACIÓN (DRY_RUN)</span>
       </div>
-      <button onclick="resetStats()" class="badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.4); cursor: pointer;" title="Reiniciar contadores a cero">
+      <button onclick="resetStats()" class="badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.4); cursor: pointer;" title="Reiniciar contadores">
         <i data-lucide="rotate-ccw" style="width: 14px;"></i>
-        Reiniciar Contadores
+        Reiniciar
       </button>
     </div>
   </header>
 
   <div class="container">
 
-    <!-- 📊 BARRA DE TELEMETRÍA EN VIVO: SALDOS, BILLETERA, CONTRATOS Y ÓRDENES EJECUTADAS -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; background: rgba(17, 24, 39, 0.9); border: 1px solid rgba(0, 242, 254, 0.3); border-radius: 16px; padding: 1.1rem 1.25rem; box-shadow: 0 8px 30px rgba(0,0,0,0.4);">
+    <!-- 📊 BARRA DE TELEMETRÍA EN VIVO (100% DATOS REALES DE FLASH LOANS) -->
+    <div class="telemetry-grid">
       
-      <!-- KPI 1: Billetera & Contratos On-Chain -->
-      <div style="border-right: 1px solid rgba(255,255,255,0.07); padding-right: 0.75rem;">
-        <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.3rem;">
-          🔐 Billetera & Contratos Auditados
-        </div>
-        <div style="font-size: 0.92rem; font-weight: 700; color: #34d399; font-family: monospace;" id="kpiWalletAddr">
-          0xf6Bb92...19AC87
-        </div>
-        <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem; display: flex; gap: 0.6rem; flex-wrap: wrap;">
-          <a id="linkBaseWallet" href="https://basescan.org/address/0xf6Bb92Ac612D814F2A1e67Bf713F2f732419AC87" target="_blank" style="color: var(--accent-cyan); text-decoration: none;">↗ BaseScan</a>
-          <a id="linkArbWallet" href="https://arbiscan.io/address/0xf6Bb92Ac612D814F2A1e67Bf713F2f732419AC87" target="_blank" style="color: #c084fc; text-decoration: none;">↗ Arbiscan</a>
+      <!-- KPI 1: Cartera y Contrato -->
+      <div class="telemetry-card">
+        <div class="telemetry-label">🔐 Billetera y Contrato Base</div>
+        <div class="telemetry-value" style="color: #34d399; font-family: monospace;" id="kpiWalletAddr">0xf6Bb...19AC87</div>
+        <div style="font-size: 0.72rem; color: var(--text-muted); display: flex; gap: 0.6rem;">
+          <a id="linkBaseScan" href="https://basescan.org/address/0xf6Bb92Ac612D814F2A1e67Bf713F2f732419AC87" target="_blank" style="color: var(--accent-cyan); text-decoration: none;">↗ BaseScan</a>
           <span>Contrato: <code style="color: #facc15;" id="kpiContractAddr">0xD4A2...4018</code></span>
         </div>
       </div>
 
-      <!-- KPI 2: Saldos Reales en Billetera (Base + Arbitrum) -->
-      <div style="border-right: 1px solid rgba(255,255,255,0.07); padding-right: 0.75rem;">
-        <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.3rem;">
-          💰 Tu Saldo Real en Vivo (On-Chain)
-        </div>
-        <div style="font-size: 1.2rem; font-weight: 800; color: var(--accent-green);" id="kpiTotalBalanceUsd">
-          ~$49.10 USD
-        </div>
-        <div style="font-size: 0.74rem; color: #e2e8f0; margin-top: 0.2rem;">
-          Base: <strong style="color: #34d399;" id="kpiBaseEth">0.00988 ETH</strong> • Arb: <strong style="color: #38bdf8;" id="kpiArbEth">0.00976 ETH</strong>
-        </div>
+      <!-- KPI 2: Saldo de Gas en Cartera (Solo ETH Nativo) -->
+      <div class="telemetry-card">
+        <div class="telemetry-label">⛽ Reserva Exclusiva para Gas (ETH)</div>
+        <div class="telemetry-value" style="color: var(--accent-cyan);" id="kpiNativeGasEth">0.00988 ETH</div>
+        <div style="font-size: 0.72rem; color: var(--text-muted);" id="kpiNativeGasUsd">~$24.70 USD en Base</div>
       </div>
 
-      <!-- KPI 3: Contador de Órdenes Ejecutadas / Disparadas -->
-      <div style="border-right: 1px solid rgba(255,255,255,0.07); padding-right: 0.75rem;">
-        <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.3rem;">
-          ⚡ Órdenes Ejecutadas / Disparadas
-        </div>
-        <div style="display: flex; align-items: baseline; gap: 0.5rem;">
-          <span style="font-size: 1.35rem; font-weight: 800; color: var(--accent-cyan);" id="kpiTotalOrders">0</span>
-          <span style="font-size: 0.72rem; color: var(--text-muted);" id="kpiScansTotal">(0 escaneos RPC)</span>
-        </div>
-        <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;" id="kpiOrdersBreakdown">
-          Low-Fee: 0 | Base: 0 | Arbitrum: 0
-        </div>
+      <!-- KPI 3: Guardia de Gas Diario -->
+      <div class="telemetry-card">
+        <div class="telemetry-label">🛡️ Límite Diario de Gas (Guardia)</div>
+        <div class="telemetry-value" style="color: var(--accent-yellow);" id="kpiGasGuard">0.00000 / 0.00150 ETH</div>
+        <div style="font-size: 0.72rem; color: #10b981;">● Protección contra drenaje de gas activa</div>
       </div>
 
-      <!-- KPI 4: Ganancia Neta (PnL) -->
-      <div>
-        <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.3rem;">
-          📈 Ganancia Neta Acumulada (PnL)
-        </div>
-        <div style="font-size: 1.35rem; font-weight: 800; color: var(--accent-yellow);" id="kpiTotalPnl">
-          +$0.0000 USD
-        </div>
-        <div style="font-size: 0.72rem; color: #34d399; margin-top: 0.2rem;">
-          ● Verificación <code style="color:#fff;">staticCall</code> + <code style="color:#fff;">estimateGas</code> activa
-        </div>
+      <!-- KPI 4: Órdenes y PnL Realizado -->
+      <div class="telemetry-card">
+        <div class="telemetry-label">📈 Órdenes Minadas y PnL Neto</div>
+        <div class="telemetry-value" style="color: var(--accent-green);" id="kpiRealizedPnl">+$0.0000 USD</div>
+        <div style="font-size: 0.72rem; color: var(--text-muted);" id="kpiOrdersCount">0 minadas | 0 simuladas</div>
       </div>
 
     </div>
 
-    <!-- View Mode Filter Selector -->
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-      <div class="filter-tabs">
-        <button class="tab-btn active tab-all" onclick="setFilter('ALL', this)">
-          <i data-lucide="layout-grid" style="width: 16px;"></i>
-          🌐 Vista Unificada (3 Motores)
-        </button>
-        <button class="tab-btn tab-lowfee" onclick="setFilter('LOW_FEE', this)">
-          <i data-lucide="sparkles" style="width: 16px;"></i>
-          🟣 Motor Low-Fee (0.01% / 0.05%)
-        </button>
-        <button class="tab-btn tab-spot" onclick="setFilter('SPOT', this)">
-          <i data-lucide="wallet" style="width: 16px;"></i>
-          🟢 Motor Base (Espacial & Triangular)
-        </button>
-        <button class="tab-btn tab-flash" onclick="setFilter('FLASH', this)">
-          <i data-lucide="zap" style="width: 16px;"></i>
-          ⚡ Motor Arbitrum (Flash Loans)
-        </button>
-      </div>
-
-      <div style="font-size: 0.8rem; color: var(--text-muted);">
-        Actualización en vivo: <strong style="color: var(--accent-cyan);" id="lblLastUpdate">Conectado</strong>
-      </div>
-    </div>
-
-    <!-- COMMAND PANELS (3 Motores Reales) -->
-    <div class="dual-command-grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
+    <!-- MOTORES DE FLASH LOANS EN PARALELO -->
+    <div class="command-grid">
       
-      <!-- 🟣 PANEL 1: Motor Low-Fee (0.01% - 0.05%) -->
-      <div class="command-panel panel-lowfee" id="panelLowFee" style="border-left: 4px solid #a855f7; border-color: rgba(168, 85, 247, 0.4);">
-        <div class="panel-header">
-          <div>
-            <div class="panel-title" style="color: #c084fc;">
-              <i data-lucide="sparkles"></i>
-              MOTOR 1: POOLS BAJA COMISIÓN (0.01% / 0.05%)
-            </div>
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">
-              Base (8453) & Arbitrum (42161) • Simulación On-Chain Real
-            </div>
-          </div>
-          <div class="pair-type-pill type-lowfee">
-            LOW-FEE ENGINE
-          </div>
-        </div>
-
-        <div class="panel-metrics-grid">
-          <div class="metric-box">
-            <div class="metric-label">Tiers Escaneados</div>
-            <div class="metric-value" style="color: #c084fc; font-size: 1.1rem;">1 bps & 5 bps</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted);">UniV3, Aero, PancakeV3</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Préstamo Base</div>
-            <div class="metric-value" style="color: var(--accent-yellow); font-size: 1.1rem;">0.2 WETH / 500 USDC</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted);">Balancer V2 (0% Fee)</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Órdenes Low-Fee</div>
-            <div class="metric-value" style="color: var(--accent-cyan); font-size: 1.1rem;" id="valLowFeeExec">0</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted);" id="valLowFeePnl">PnL: +$0.0000 USD</div>
-          </div>
-        </div>
-
-        <div>
-          <div style="font-size: 0.8rem; font-weight: 700; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
-            <span style="display: flex; align-items: center; gap: 0.4rem;">
-              <i data-lucide="terminal" style="width: 14px; color: #c084fc;"></i>
-              Consola en Vivo: LowFeeExecutor
-            </span>
-            <span style="font-size: 0.65rem; color: #c084fc;">● CICLO 1200ms</span>
-          </div>
-          <div class="terminal-card" id="terminalLowFee">
-            <div class="terminal-line lowfee">[LOW-FEE] Escaneando pools reales de 1bps y 5bps en Base y Arbitrum...</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 🟢 PANEL 2: Motor Base Mainnet (8453) -->
-      <div class="command-panel panel-spot" id="panelSpot">
-        <div class="panel-header">
-          <div>
-            <div class="panel-title" style="color: var(--accent-green);">
-              <i data-lucide="wallet"></i>
-              MOTOR 2: BASE MAINNET (ESPACIAL & TRIANGULAR)
-            </div>
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">
-              Wallet: <code style="color: #34d399;" id="valWalletCode">0xf6Bb...AC87</code> • Base: <span id="valGasEth">0.00988 ETH</span> • Arb: <span id="valGasArbEth">0.00976 ETH</span>
-            </div>
-          </div>
-          <div class="pair-type-pill type-spot">
-            BASE (8453)
-          </div>
-        </div>
-
-        <div class="panel-metrics-grid">
-          <div class="metric-box">
-            <div class="metric-label">Saldo Gas Total</div>
-            <div class="metric-value" style="color: var(--accent-green); font-size: 1.1rem;" id="valSpotWeth">0.0196 ETH</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted);" id="valSpotUsd">~$49.10 USD (Base + Arb)</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Ganancia Mínima</div>
-            <div class="metric-value" style="color: var(--accent-yellow); font-size: 1.1rem;" id="valMinProfit">+$0.25 USD</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted);">Umbral Neto Post-Gas</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Tokens Verificados</div>
-            <div class="metric-value" style="color: var(--accent-cyan); font-size: 1.1rem;" id="valBaseTokens">27 Tokens</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted);">UniV3 + Aerodrome</div>
-          </div>
-        </div>
-
-        <div>
-          <div style="font-size: 0.8rem; font-weight: 700; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
-            <span style="display: flex; align-items: center; gap: 0.4rem;">
-              <i data-lucide="terminal" style="width: 14px; color: var(--accent-green);"></i>
-              Consola en Vivo: SpotExecutor (Base 8453)
-            </span>
-            <span style="font-size: 0.65rem; color: var(--accent-green);">● ON-CHAIN QUOTER</span>
-          </div>
-          <div class="terminal-card" id="terminalSpot">
-            <div class="terminal-line spot">[BASE EXECUTOR] Cotizando rutas espaciales (2 patas) y triangulares (3 patas) en Base...</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ⚡ PANEL 3: Motor Arbitrum One (42161) -->
-      <div class="command-panel panel-flash" id="panelFlash">
+      <!-- PANEL 1: Motor Flash Espacial 2-Leg -->
+      <div class="command-panel" style="border-left: 4px solid var(--accent-cyan);">
         <div class="panel-header">
           <div>
             <div class="panel-title" style="color: var(--accent-cyan);">
               <i data-lucide="zap"></i>
-              MOTOR 3: ARBITRUM ONE (FLASH LOANS)
+              MOTOR FLASH ESPACIAL (2-LEG) — BASE
             </div>
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">
-              Balancer V2 (0% Fee) & Aave V3 • UniV3, CamelotV3, SushiV3, PancakeV3
+            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">
+              Uniswap V3 ↔ Aerodrome (Slipstream & V2) • 0% Capital Propio
             </div>
           </div>
-          <div class="pair-type-pill type-flash">
-            ARBITRUM (42161)
+          <div class="pair-type-pill" style="background: rgba(0, 242, 254, 0.15); color: var(--accent-cyan); border: 1px solid rgba(0, 242, 254, 0.3);">
+            ESPACIAL
           </div>
         </div>
 
         <div class="panel-metrics-grid">
           <div class="metric-box">
-            <div class="metric-label">Rango Flash Loan</div>
-            <div class="metric-value" style="color: var(--accent-cyan); font-size: 1.1rem;">0.15 - 5.0 WETH</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted);">Escalado según Spread</div>
+            <div class="metric-label">Proveedor Principal</div>
+            <div class="metric-value" style="color: var(--accent-cyan);">Balancer V2 (0%)</div>
+            <div style="font-size: 0.68rem; color: var(--text-muted);">Fallback: Aave V3 (0.05%)</div>
           </div>
           <div class="metric-box">
-            <div class="metric-label">Proveedor Flash</div>
-            <div class="metric-value" style="color: #fff; font-size: 1.1rem;">Balancer V2 (0%)</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted);">Fallback: Aave V3 (0.05%)</div>
+            <div class="metric-label">Umbral Mínimo</div>
+            <div class="metric-value" style="color: var(--accent-yellow);" id="valMinProfitEsp">+$0.25 USD</div>
+            <div style="font-size: 0.68rem; color: var(--text-muted);">Post-Gas & Slippage</div>
           </div>
           <div class="metric-box">
-            <div class="metric-label">Órdenes Arbitrum</div>
-            <div class="metric-value" style="color: var(--accent-yellow); font-size: 1.1rem;" id="valArbExec">0</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted);" id="valArbPnl">PnL: +$0.0000 USD</div>
+            <div class="metric-label">Tiers de Préstamo</div>
+            <div class="metric-value" style="color: #fff;">0.5 - 25 WETH</div>
+            <div style="font-size: 0.68rem; color: var(--text-muted);">Dinámico según spread</div>
           </div>
         </div>
 
         <div>
-          <div style="font-size: 0.8rem; font-weight: 700; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
-            <span style="display: flex; align-items: center; gap: 0.4rem;">
-              <i data-lucide="terminal" style="width: 14px; color: var(--accent-cyan);"></i>
-              Consola en Vivo: ArbitrumExecutor (42161)
-            </span>
-            <span style="font-size: 0.65rem; color: var(--accent-cyan);">● CICLO 1500ms</span>
+          <div style="font-size: 0.75rem; font-weight: 700; margin-bottom: 0.4rem; display: flex; justify-content: space-between;">
+            <span>Consola en Vivo: SpotExecutor (Base 8453)</span>
+            <span style="color: var(--accent-cyan);">● STATICCALL VERIFIED</span>
           </div>
-          <div class="terminal-card" id="terminalFlash">
-            <div class="terminal-line flash">[ARBITRUM EXECUTOR] Escaneando pares reales en UniV3, CamelotV3, SushiV3 y PancakeV3...</div>
+          <div class="terminal-card" id="terminalEspacial">
+            <div class="terminal-line" style="color: #38bdf8;">[FLASH-ESPACIAL] Escaneando rutas espaciales WETH/USDC/cbBTC en Base Mainnet...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PANEL 2: Motor Flash Triangular 3-Leg & Low-Fee Pools -->
+      <div class="command-panel" style="border-left: 4px solid var(--accent-purple);">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title" style="color: #c084fc;">
+              <i data-lucide="layers"></i>
+              MOTOR FLASH TRIANGULAR (3-LEG) & LOW-FEE
+            </div>
+            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">
+              Pools de 0.01% y 0.05% • Ciclos Atómicos Multicall
+            </div>
+          </div>
+          <div class="pair-type-pill" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3);">
+            TRIANGULAR / LOW-FEE
+          </div>
+        </div>
+
+        <div class="panel-metrics-grid">
+          <div class="metric-box">
+            <div class="metric-label">Tiers de Pool</div>
+            <div class="metric-value" style="color: #c084fc;">1 bps & 5 bps</div>
+            <div style="font-size: 0.68rem; color: var(--text-muted);">UniV3 + Aerodrome</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Protección L1 Fee</div>
+            <div class="metric-value" style="color: var(--accent-green);">SweetSpot Fjord</div>
+            <div style="font-size: 0.68rem; color: var(--text-muted);">EIP-4844 Blobs auditados</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Control de Slippage</div>
+            <div class="metric-value" style="color: #fff;">15 bps Buffer</div>
+            <div style="font-size: 0.68rem; color: var(--text-muted);">Filtro anti-reversión</div>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size: 0.75rem; font-weight: 700; margin-bottom: 0.4rem; display: flex; justify-content: space-between;">
+            <span>Consola en Vivo: LowFeeExecutor</span>
+            <span style="color: #c084fc;">● MUTEX PROTECTED</span>
+          </div>
+          <div class="terminal-card" id="terminalTriangular">
+            <div class="terminal-line" style="color: #c084fc;">[LOW-FEE] Escaneando pools de baja comisión y ciclos triangulares atómicos...</div>
           </div>
         </div>
       </div>
 
     </div>
 
-    <!-- Oportunidades y Rutas Detectadas -->
+    <!-- OPORTUNIDADES REALES DETECTADAS CON STATICCALL -->
     <div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <div style="font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+        <div style="font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
           <i data-lucide="radar" style="color: var(--accent-yellow);"></i>
-          OPORTUNIDADES VERIFICADAS CON STATICCALL ON-CHAIN
+          OPORTUNIDADES DE FLASH LOAN EVALUADAS ON-CHAIN
         </div>
         <div id="oppCountBadge" style="font-size: 0.75rem; color: var(--text-muted);">
-          Cargando rutas...
+          Escaneando...
         </div>
       </div>
 
@@ -504,42 +380,47 @@
       </div>
     </div>
 
+    <!-- LIBRO MAYOR (LEDGER) DE EJECUCIÓN: SIMULACIONES VS TRANSACCIONES MINADAS -->
+    <div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
+        <div style="font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+          <i data-lucide="scroll-text" style="color: var(--accent-cyan);"></i>
+          REGISTRO AUDITADO DE EJECUCIÓN (LEDGER EN VIVO)
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">
+          Auditoría en tiempo real de llamadas <code style="color:#fff;">staticCall</code> y transacciones en cadena
+        </div>
+      </div>
+
+      <div class="ledger-table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Hora</th>
+              <th>Par / Ruta</th>
+              <th>Préstamo</th>
+              <th>Proveedor</th>
+              <th>Estado</th>
+              <th>Gas Efectivo</th>
+              <th>Beneficio Neto</th>
+              <th>Transacción / Recibo</th>
+            </tr>
+          </thead>
+          <tbody id="ledgerTableBody">
+            <tr>
+              <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                Cargando historial de ejecuciones...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
 
   <script>
     lucide.createIcons();
-
-    let currentFilter = 'ALL';
-
-    function setFilter(filter, btn) {
-      currentFilter = filter;
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-
-      const panelSpot = document.getElementById('panelSpot');
-      const panelFlash = document.getElementById('panelFlash');
-      const panelLowFee = document.getElementById('panelLowFee');
-
-      if (filter === 'SPOT') {
-        panelSpot.style.display = 'flex';
-        panelFlash.style.display = 'none';
-        if (panelLowFee) panelLowFee.style.display = 'none';
-      } else if (filter === 'FLASH') {
-        panelSpot.style.display = 'none';
-        panelFlash.style.display = 'flex';
-        if (panelLowFee) panelLowFee.style.display = 'none';
-      } else if (filter === 'LOW_FEE') {
-        panelSpot.style.display = 'none';
-        panelFlash.style.display = 'none';
-        if (panelLowFee) panelLowFee.style.display = 'flex';
-      } else {
-        panelSpot.style.display = 'flex';
-        panelFlash.style.display = 'flex';
-        if (panelLowFee) panelLowFee.style.display = 'flex';
-      }
-
-      updateDashboard();
-    }
 
     async function resetStats() {
       try {
@@ -550,18 +431,20 @@
 
     async function updateDashboard() {
       try {
-        const res = await fetch('/api/status');
-        if (!res.ok) return;
-        const data = await res.json();
-        const stats = data.stats;
+        const [resStatus, resLedger] = await Promise.all([
+          fetch('/api/status').then(r => r.json()).catch(() => null),
+          fetch('/api/ledger').then(r => r.json()).catch(() => null),
+        ]);
 
-        document.getElementById('lblLastUpdate').innerText = new Date().toLocaleTimeString();
+        if (!resStatus) return;
+        const stats = resStatus.stats;
+        const ledger = resLedger || resStatus.executionLedger;
 
-        // Actualizar indicador de Modo DRY_RUN vs LIVE
+        // Modo DRY_RUN
         const lblExecMode = document.getElementById('lblExecMode');
         const badgeExecMode = document.getElementById('badgeExecMode');
         if (lblExecMode && badgeExecMode) {
-          if (data.dryRun) {
+          if (resStatus.dryRun) {
             lblExecMode.innerText = 'MODO: SIMULACIÓN (DRY_RUN)';
             badgeExecMode.style.background = 'rgba(250, 204, 21, 0.15)';
             badgeExecMode.style.color = '#facc15';
@@ -574,198 +457,165 @@
           }
         }
 
-        // 0. Actualizar Barra Superior de Saldos Reales, Billetera y Órdenes Ejecutadas
+        // Saldos y Cartera
         if (stats && stats.spotBase) {
           const w = stats.spotBase.wallet || '0xf6Bb92Ac612D814F2A1e67Bf713F2f732419AC87';
-          const shortW = `${w.slice(0, 6)}...${w.slice(-4)}`;
           const baseEth = Number(stats.spotBase.nativeGasETH ?? 0.009876);
-          const arbEth = Number(stats.spotBase.nativeGasArbETH ?? 0.009761);
-          const totalEth = baseEth + arbEth;
-          const totalUsd = Number(stats.spotBase.balanceUSD ?? (totalEth * 2500));
+          const gasUsd = baseEth * 2500;
 
           const elKpiWallet = document.getElementById('kpiWalletAddr');
           if (elKpiWallet) elKpiWallet.innerText = `${w.slice(0, 8)}...${w.slice(-6)}`;
-          const elWalletCode = document.getElementById('valWalletCode');
-          if (elWalletCode) elWalletCode.innerText = shortW;
 
-          const elBaseEth = document.getElementById('kpiBaseEth');
-          if (elBaseEth) elBaseEth.innerText = `${baseEth.toFixed(5)} ETH`;
-          const elArbEth = document.getElementById('kpiArbEth');
-          if (elArbEth) elArbEth.innerText = `${arbEth.toFixed(5)} ETH`;
-          const elTotalUsd = document.getElementById('kpiTotalBalanceUsd');
-          if (elTotalUsd) elTotalUsd.innerText = `~$${totalUsd.toFixed(2)} USD`;
+          const elGasEth = document.getElementById('kpiNativeGasEth');
+          if (elGasEth) elGasEth.innerText = `${baseEth.toFixed(5)} ETH`;
 
-          const elValGasEth = document.getElementById('valGasEth');
-          if (elValGasEth) elValGasEth.innerText = `${baseEth.toFixed(5)} ETH`;
-          const elValGasArb = document.getElementById('valGasArbEth');
-          if (elValGasArb) elValGasArb.innerText = `${arbEth.toFixed(5)} ETH`;
-          const elValSpotWeth = document.getElementById('valSpotWeth');
-          if (elValSpotWeth) elValSpotWeth.innerText = `${totalEth.toFixed(4)} ETH`;
-          const elValSpotUsd = document.getElementById('valSpotUsd');
-          if (elValSpotUsd) elValSpotUsd.innerText = `~$${totalUsd.toFixed(2)} USD (Base + Arb)`;
+          const elGasUsd = document.getElementById('kpiNativeGasUsd');
+          if (elGasUsd) elGasUsd.innerText = `~$${gasUsd.toFixed(2)} USD en Base`;
 
-          const elMinProfit = document.getElementById('valMinProfit');
-          if (elMinProfit) elMinProfit.innerText = `+$${Number(data.minProfitUSD ?? 0.25).toFixed(2)} USD`;
-          const elBaseTokens = document.getElementById('valBaseTokens');
-          if (elBaseTokens) elBaseTokens.innerText = `${stats.spotBase.tokensTracked || 27} Tokens`;
-
-          const lowFeeOrders = Number((stats.lowFee && stats.lowFee.executedCount) || 0);
-          const spotOrders = Number(stats.spotBase.executedCount || 0);
-          const flashOrders = Number((stats.flashLoans && stats.flashLoans.onChainExecutedCount) || 0);
-          const totalOrders = lowFeeOrders + spotOrders + flashOrders;
-
-          const elTotalOrders = document.getElementById('kpiTotalOrders');
-          if (elTotalOrders) elTotalOrders.innerText = String(totalOrders);
-          const elScansTotal = document.getElementById('kpiScansTotal');
-          if (elScansTotal) elScansTotal.innerText = `(${Number(stats.scansCompleted || 0).toLocaleString()} escaneos RPC)`;
-          const elBreakdown = document.getElementById('kpiOrdersBreakdown');
-          if (elBreakdown) elBreakdown.innerText = `Low-Fee: ${lowFeeOrders} | Base: ${spotOrders} | Arbitrum: ${flashOrders}`;
-
-          const lowFeePnl = Number((stats.lowFee && stats.lowFee.realizedPnLUSD) || 0);
-          const spotPnl = Number(stats.spotBase.realizedPnLUSD || 0);
-          const flashPnl = Number((stats.flashLoans && stats.flashLoans.detectedPnLUSD) || 0);
-          const totalPnl = lowFeePnl + spotPnl + flashPnl;
-
-          const elTotalPnl = document.getElementById('kpiTotalPnl');
-          if (elTotalPnl) elTotalPnl.innerText = `+$${totalPnl.toFixed(4)} USD`;
-
-          const elLowFeeExec = document.getElementById('valLowFeeExec');
-          if (elLowFeeExec) elLowFeeExec.innerText = String(lowFeeOrders);
-          const elLowFeePnl = document.getElementById('valLowFeePnl');
-          if (elLowFeePnl) elLowFeePnl.innerText = `PnL: +$${lowFeePnl.toFixed(4)} USD`;
-
-          const elArbExec = document.getElementById('valArbExec');
-          if (elArbExec) elArbExec.innerText = String(flashOrders);
-          const elArbPnl = document.getElementById('valArbPnl');
-          if (elArbPnl) elArbPnl.innerText = `PnL: +$${flashPnl.toFixed(4)} USD`;
+          const elMinProfit = document.getElementById('valMinProfitEsp');
+          if (elMinProfit) elMinProfit.innerText = `+$${Number(resStatus.minProfitUSD ?? 0.25).toFixed(2)} USD`;
         }
 
-        // 1. Actualizar Consola de Low-Fee (0.01% y 0.05%)
-        if (data.lowFeeLogs && data.lowFeeLogs.length > 0) {
-          const terminalLowFee = document.getElementById('terminalLowFee');
-          if (terminalLowFee) {
-            terminalLowFee.innerHTML = data.lowFeeLogs.map(l => `<div class="terminal-line lowfee">${l}</div>`).join('');
+        // Guardia de Gas Diario y PnL del Ledger
+        if (ledger) {
+          const spentEth = Number(ledger.totalGasSpentETH ?? 0);
+          const elGasGuard = document.getElementById('kpiGasGuard');
+          if (elGasGuard) elGasGuard.innerText = `${spentEth.toFixed(5)} / 0.00150 ETH`;
+
+          const realizedPnl = Number(ledger.realizedPnLUSD ?? 0);
+          const elRealizedPnl = document.getElementById('kpiRealizedPnl');
+          if (elRealizedPnl) {
+            elRealizedPnl.innerText = `${realizedPnl >= 0 ? '+' : ''}$${realizedPnl.toFixed(4)} USD`;
+            elRealizedPnl.style.color = realizedPnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+          }
+
+          const elOrders = document.getElementById('kpiOrdersCount');
+          if (elOrders) {
+            elOrders.innerText = `${ledger.minedSuccessCount ?? 0} minadas | ${ledger.simulatedCount ?? 0} simuladas`;
+          }
+
+          // Renderizar tabla del Ledger
+          const tbody = document.getElementById('ledgerTableBody');
+          if (tbody && ledger.recentEntries) {
+            if (ledger.recentEntries.length === 0) {
+              tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No hay operaciones registradas aún. El bot está escaneando pools en modo DRY_RUN.</td></tr>`;
+            } else {
+              tbody.innerHTML = ledger.recentEntries.slice(0, 15).map(e => {
+                let statusBadge = '<span class="status-badge status-simulated">SIMULADO</span>';
+                if (e.status === 'MINED_SUCCESS') statusBadge = '<span class="status-badge status-mined-success">MINADA ÉXITO</span>';
+                else if (e.status === 'MINED_REVERTED') statusBadge = '<span class="status-badge status-mined-revert">REVERTIDA</span>';
+                else if (e.status === 'SIMULATED_REVERT') statusBadge = '<span class="status-badge status-sim-revert">PRE-FLIGHT ABORT</span>';
+
+                const timeStr = new Date(e.timestamp).toLocaleTimeString();
+                const gasCost = e.actualGasCostUSD != null ? `$${e.actualGasCostUSD.toFixed(4)}` : `$${e.simulatedGasUSD.toFixed(4)} (est)`;
+                const netProfit = e.realizedNetProfitUSD != null ? e.realizedNetProfitUSD : e.simulatedNetProfitUSD;
+                const netColor = netProfit >= 0 ? '#34d399' : '#f87171';
+
+                const txCell = e.txHash
+                  ? `<a href="https://basescan.org/tx/${e.txHash}" target="_blank" style="color: var(--accent-cyan); text-decoration: none;">${e.txHash.slice(0, 10)}... ↗</a>`
+                  : `<span style="color: var(--text-muted);">${e.notes || 'Simulación local'}</span>`;
+
+                return `
+                  <tr>
+                    <td>${timeStr}</td>
+                    <td><strong>${e.pairName}</strong></td>
+                    <td>${e.loanAmount} ${e.loanTokenSymbol}</td>
+                    <td><span style="text-transform: capitalize; color: #c084fc;">${e.provider}</span></td>
+                    <td>${statusBadge}</td>
+                    <td>${gasCost}</td>
+                    <td style="color: ${netColor}; font-weight: 700;">${netProfit >= 0 ? '+' : ''}$${netProfit.toFixed(4)} USD</td>
+                    <td>${txCell}</td>
+                  </tr>
+                `;
+              }).join('');
+            }
           }
         }
 
-        // 2. Actualizar Consola de Base (8453)
-        if (data.spotLogs && data.spotLogs.length > 0) {
-          const terminalSpot = document.getElementById('terminalSpot');
-          if (terminalSpot) {
-            terminalSpot.innerHTML = data.spotLogs.map(l => `<div class="terminal-line spot">${l}</div>`).join('');
-          }
+        // Actualizar Consolas
+        if (resStatus.spotLogs && resStatus.spotLogs.length > 0) {
+          const tEsp = document.getElementById('terminalEspacial');
+          if (tEsp) tEsp.innerHTML = resStatus.spotLogs.slice(0, 25).map(l => `<div class="terminal-line" style="color: #38bdf8;">${l}</div>`).join('');
+        }
+        if (resStatus.lowFeeLogs && resStatus.lowFeeLogs.length > 0) {
+          const tTri = document.getElementById('terminalTriangular');
+          if (tTri) tTri.innerHTML = resStatus.lowFeeLogs.slice(0, 25).map(l => `<div class="terminal-line" style="color: #c084fc;">${l}</div>`).join('');
         }
 
-        // 3. Actualizar Consola de Arbitrum (42161)
-        if (data.flashLogs && data.flashLogs.length > 0) {
-          const terminalFlash = document.getElementById('terminalFlash');
-          if (terminalFlash) {
-            terminalFlash.innerHTML = data.flashLogs.map(l => `<div class="terminal-line flash">${l}</div>`).join('');
-          }
-        }
-
-        // 4. Renderizar Oportunidades Reales Verificadas con staticCall
+        // Renderizar Oportunidades
         const oppsGrid = document.getElementById('opportunitiesGrid');
-        oppsGrid.innerHTML = '';
+        const opps = [
+          ...(stats.lowFeeOpportunities || []),
+          ...(stats.spotOpportunities || []),
+        ];
 
-        let opps = [];
-        if (currentFilter === 'SPOT') {
-          opps = (stats.spotOpportunities && stats.spotOpportunities.length > 0)
-            ? stats.spotOpportunities
-            : (stats.lastOpportunities || []).filter(o => o.type === 'SPOT_BASE');
-        } else if (currentFilter === 'LOW_FEE') {
-          opps = (stats.lowFeeOpportunities && stats.lowFeeOpportunities.length > 0)
-            ? stats.lowFeeOpportunities
-            : (stats.lastOpportunities || []).filter(o => o.type === 'LOW_FEE');
-        } else if (currentFilter === 'FLASH') {
-          opps = (stats.flashOpportunities && stats.flashOpportunities.length > 0)
-            ? stats.flashOpportunities
-            : (stats.lastOpportunities || []).filter(o => o.type === 'FLASH_LOAN');
-        } else {
-          opps = [
-            ...(stats.lowFeeOpportunities || []),
-            ...(stats.spotOpportunities || []),
-            ...(stats.flashOpportunities || [])
-          ];
-          if (opps.length === 0) opps = stats.lastOpportunities || [];
-        }
-
-        document.getElementById('oppCountBadge').innerText = `Mostrando ${opps.length} oportunidades verificadas`;
+        document.getElementById('oppCountBadge').innerText = `${opps.length} oportunidades evaluadas`;
 
         if (opps.length === 0) {
           oppsGrid.innerHTML = `
-            <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; background: var(--bg-card); border-radius: 16px; border: 1px dashed var(--border-color); color: var(--text-muted);">
+            <div style="grid-column: 1 / -1; text-align: center; padding: 2.5rem; background: var(--bg-card); border-radius: 16px; border: 1px dashed var(--border-color); color: var(--text-muted);">
               <i data-lucide="radar" style="width: 32px; height: 32px; margin-bottom: 0.5rem; color: var(--accent-cyan);"></i>
-              <div>Escaneando pools reales en Base (8453) y Arbitrum One (42161)...</div>
-              <div style="font-size: 0.75rem; margin-top: 0.3rem;">Solo se muestran rutas que superan la simulación atómica <code style="color:#fff;">staticCall</code> en la blockchain.</div>
+              <div>Escaneando pools reales en Base Mainnet (8453)...</div>
+              <div style="font-size: 0.75rem; margin-top: 0.3rem;">Solo se muestran rutas evaluadas con <code style="color:#fff;">staticCall</code> y margen neto post-gas positivo.</div>
             </div>
           `;
           lucide.createIcons();
           return;
         }
 
-        for (const opp of opps) {
+        oppsGrid.innerHTML = opps.slice(0, 6).map(opp => {
           const isLowFee = opp.type === 'LOW_FEE';
-          const isSpot = opp.type === 'SPOT_BASE';
-          const card = document.createElement('div');
-          card.className = `pair-card ${isLowFee ? 'card-lowfee' : (isSpot ? 'card-spot' : 'card-flash')}`;
+          const accentColor = isLowFee ? '#c084fc' : 'var(--accent-cyan)';
+          const accentBg = isLowFee ? 'rgba(168, 85, 247, 0.08)' : 'rgba(0, 242, 254, 0.08)';
+          const accentBorder = isLowFee ? 'rgba(168, 85, 247, 0.3)' : 'rgba(0, 242, 254, 0.3)';
 
-          const pillClass = isLowFee ? 'type-lowfee' : (isSpot ? 'type-spot' : 'type-flash');
-          const pillText = isLowFee
-            ? `🟣 LOW-FEE (${opp.feeTier || '0.05%'})`
-            : (isSpot ? '🟢 BASE (8453)' : '⚡ ARBITRUM (42161)');
+          return `
+            <div class="pair-card">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="pair-type-pill" style="background: ${accentBg}; color: ${accentColor}; border: 1px solid ${accentBorder};">
+                  ${isLowFee ? `LOW-FEE (${opp.feeTier || '0.05%'})` : 'FLASH ESPACIAL'}
+                </span>
+                <span style="font-size: 0.7rem; color: var(--text-muted);">
+                  ${new Date(opp.timestamp || Date.now()).toLocaleTimeString()}
+                </span>
+              </div>
 
-          const accentColor = isLowFee ? '#c084fc' : (isSpot ? 'var(--accent-green)' : 'var(--accent-cyan)');
-          const accentBg = isLowFee ? 'rgba(168, 85, 247, 0.08)' : (isSpot ? 'rgba(16, 185, 129, 0.08)' : 'rgba(0, 242, 254, 0.08)');
-          const accentBorder = isLowFee ? 'rgba(168, 85, 247, 0.3)' : (isSpot ? 'rgba(16, 185, 129, 0.3)' : 'rgba(0, 242, 254, 0.3)');
+              <div style="font-family: 'Outfit', sans-serif; font-size: 1.05rem; font-weight: 700;">
+                ${opp.pairName}
+              </div>
 
-          card.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span class="pair-type-pill ${pillClass}">
-                ${pillText}
-              </span>
-              <span style="font-size: 0.7rem; color: var(--text-muted);">
-                ${new Date(opp.timestamp || Date.now()).toLocaleTimeString()}
-              </span>
-            </div>
-
-            <div style="font-family: 'Outfit', sans-serif; font-size: 1.05rem; font-weight: 700;">
-              ${opp.pairName || 'Ruta de Arbitraje'}
-            </div>
-
-            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 0.6rem; font-size: 0.75rem; display: flex; justify-content: space-between;">
-              <div>
-                <div style="color: var(--text-muted);">DEX Compra / Venta</div>
-                <div style="font-weight: 600; text-transform: capitalize;">
-                  ${(opp.leg1 && opp.leg1.protocolId) || opp.protocolA || 'UniV3'} ➔ ${(opp.leg2 && opp.leg2.protocolId) || opp.protocolB || (opp.chainId === 42161 ? 'CamelotV3' : 'AeroV2')}
+              <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 0.6rem; font-size: 0.75rem; display: flex; justify-content: space-between;">
+                <div>
+                  <div style="color: var(--text-muted);">DEX Compra / Venta</div>
+                  <div style="font-weight: 600; text-transform: capitalize;">
+                    ${opp.protocolA || (opp.leg1 && opp.leg1.protocolId) || 'UniV3'} ➔ ${opp.protocolB || (opp.leg2 && opp.leg2.protocolId) || 'AeroV2'}
+                  </div>
+                </div>
+                <div style="text-align: right;">
+                  <div style="color: var(--text-muted);">Préstamo Flash</div>
+                  <div style="font-weight: 600; color: ${accentColor};">
+                    ${opp.loanAmount || '1.0 WETH (Balancer 0%)'}
+                  </div>
                 </div>
               </div>
-              <div style="text-align: right;">
-                <div style="color: var(--text-muted);">Préstamo Flash</div>
-                <div style="font-weight: 600; color: ${accentColor};">
-                  ${opp.loanAmount || '0.20 WETH (Balancer 0%)'}
-                </div>
-              </div>
-            </div>
 
-            <div style="display: flex; justify-content: space-between; align-items: center; background: ${accentBg}; border: 1px solid ${accentBorder}; border-radius: 10px; padding: 0.6rem 0.8rem;">
-              <div>
-                <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase;">Ganancia Neta Verificada</div>
-                <div style="font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 700; color: ${accentColor};">
-                  +$${Number(opp.netProfitUSD || opp.grossProfitUSD || 0).toFixed(4)} USD
+              <div style="display: flex; justify-content: space-between; align-items: center; background: ${accentBg}; border: 1px solid ${accentBorder}; border-radius: 10px; padding: 0.6rem 0.8rem;">
+                <div>
+                  <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase;">Beneficio Neto</div>
+                  <div style="font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 700; color: ${accentColor};">
+                    +$${Number(opp.netProfitUSD || 0).toFixed(4)} USD
+                  </div>
                 </div>
-              </div>
-              <div style="text-align: right;">
-                <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase;">Spread Real</div>
-                <div style="font-weight: 700; color: #fff;">
-                  ${Number(opp.spreadPercent || 0).toFixed(3)}%
+                <div style="text-align: right;">
+                  <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase;">Spread Real</div>
+                  <div style="font-weight: 700; color: #fff;">
+                    ${Number(opp.spreadPercent || 0).toFixed(3)}%
+                  </div>
                 </div>
               </div>
             </div>
           `;
-
-          oppsGrid.appendChild(card);
-        }
+        }).join('');
 
         lucide.createIcons();
       } catch (err) {}

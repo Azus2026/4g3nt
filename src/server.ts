@@ -6,6 +6,7 @@ import { SwarmManager } from './cluster/swarmManager';
 import { streamProcessor, StreamPayload } from './mempool/quicknodeStreamProcessor';
 import { loadPersistedStats, savePersistedStats } from './utils/statsStore';
 import { historyStore } from './utils/historyStore';
+import { executionLedger } from './utils/executionLedger';
 import { cexLagPredictor } from './scanners/cexLagPredictor';
 import { binanceWebSocketFeed } from './scanners/binanceWebSocketFeed';
 import { logger } from './utils/logger';
@@ -55,6 +56,8 @@ export const SERVER_STATS = {
   opportunitiesFound: 0,
   detectedOpportunitiesCount: 0,
   detectedPnLUSD: 0,
+  simulatedExecutedCount: 0,
+  simulatedPnLUSD: 0,
   onChainExecutedCount: 0,
   onChainRealizedPnLUSD: 0,
   
@@ -76,6 +79,8 @@ export const SERVER_STATS = {
     minTargetUSD: ENV.minProfitUSD,
     tokensTracked: 27,
     scansCount: 0,
+    simulatedCount: 0,
+    simulatedPnLUSD: 0,
     executedCount: 0,
     realizedPnLUSD: 0
   },
@@ -83,6 +88,8 @@ export const SERVER_STATS = {
     targetFeeTiers: '0.01% - 0.05% (Ultra-Bajo)',
     minSpreadHurdle: '0.12% (Rápida Ejecución)',
     scansCount: 0,
+    simulatedCount: 0,
+    simulatedPnLUSD: 0,
     executedCount: 0,
     realizedPnLUSD: 0,
     chains: ['Base (8453)', 'Arbitrum One (42161)']
@@ -93,6 +100,8 @@ export const SERVER_STATS = {
     targetChains: ['Base (8453)', 'Arbitrum One (42161)'],
     detectedOpportunitiesCount: 0,
     detectedPnLUSD: 0,
+    simulatedCount: 0,
+    simulatedPnLUSD: 0,
     onChainExecutedCount: 0
   }
 };
@@ -155,11 +164,16 @@ app.get('/api/status', (req, res) => {
     dryRun: ENV.dryRun,
     minProfitUSD: ENV.minProfitUSD,
     stats: SERVER_STATS,
+    executionLedger: executionLedger.getSummary(),
     lowFeeLogs: LOW_FEE_LOGS.slice(0, 30),
     spotLogs: SPOT_BASE_LOGS.slice(0, 30),
     flashLogs: FLASH_LOAN_LOGS.slice(0, 30),
     recentLogs: RECENT_SCAN_LOGS.slice(0, 30)
   });
+});
+
+app.get('/api/ledger', (req, res) => {
+  res.json(executionLedger.getSummary());
 });
 
 app.get('/api/history/weekly', (req, res) => {
@@ -172,6 +186,8 @@ app.all('/api/reset-stats', (req, res) => {
   SERVER_STATS.opportunitiesFound = 0;
   SERVER_STATS.detectedOpportunitiesCount = 0;
   SERVER_STATS.detectedPnLUSD = 0;
+  SERVER_STATS.simulatedExecutedCount = 0;
+  SERVER_STATS.simulatedPnLUSD = 0;
   SERVER_STATS.onChainExecutedCount = 0;
   SERVER_STATS.onChainRealizedPnLUSD = 0;
   SERVER_STATS.spotOpportunities = [];
@@ -179,15 +195,22 @@ app.all('/api/reset-stats', (req, res) => {
   SERVER_STATS.flashOpportunities = [];
   SERVER_STATS.lastOpportunities = [];
   SERVER_STATS.spotBase.scansCount = 0;
+  SERVER_STATS.spotBase.simulatedCount = 0;
+  SERVER_STATS.spotBase.simulatedPnLUSD = 0;
   SERVER_STATS.spotBase.executedCount = 0;
   SERVER_STATS.spotBase.realizedPnLUSD = 0;
   SERVER_STATS.lowFee.scansCount = 0;
+  SERVER_STATS.lowFee.simulatedCount = 0;
+  SERVER_STATS.lowFee.simulatedPnLUSD = 0;
   SERVER_STATS.lowFee.executedCount = 0;
   SERVER_STATS.lowFee.realizedPnLUSD = 0;
   SERVER_STATS.flashLoans.detectedOpportunitiesCount = 0;
   SERVER_STATS.flashLoans.detectedPnLUSD = 0;
+  SERVER_STATS.flashLoans.simulatedCount = 0;
+  SERVER_STATS.flashLoans.simulatedPnLUSD = 0;
   SERVER_STATS.flashLoans.onChainExecutedCount = 0;
   historyStore.clearHistory();
+  executionLedger.reset();
   savePersistedStats();
   res.json({ success: true, message: 'Estadísticas e historial reiniciados a 0 exitosamente', stats: SERVER_STATS });
 });
@@ -245,31 +268,32 @@ app.get('/api/cex-lag', (req, res) => {
   });
 });
 
+let cachedBaseProvider: any = null;
+let cachedArbProvider: any = null;
+
 async function refreshOnChainBalances() {
   try {
     const { ethers } = await import('ethers');
     const walletAddr = SERVER_STATS.spotBase.wallet;
-    const baseProvider = new ethers.JsonRpcProvider('https://mainnet.base.org');
-    const arbProvider = new ethers.JsonRpcProvider('https://arb1.arbitrum.io/rpc');
+    if (!cachedBaseProvider) cachedBaseProvider = new ethers.JsonRpcProvider('https://base-rpc.publicnode.com', 8453, { staticNetwork: true });
+    if (!cachedArbProvider) cachedArbProvider = new ethers.JsonRpcProvider('https://arbitrum-one-rpc.publicnode.com', 42161, { staticNetwork: true });
 
     const [baseBal, arbBal] = await Promise.all([
-      baseProvider.getBalance(walletAddr).catch(() => null),
-      arbProvider.getBalance(walletAddr).catch(() => null),
+      cachedBaseProvider.getBalance(walletAddr).catch(() => null),
+      cachedArbProvider.getBalance(walletAddr).catch(() => null),
     ]);
 
     const ethPrice = cexLagPredictor.getCEXPrice('ETH') || 2500;
-    let totalEth = 0;
 
     if (baseBal != null) {
       const bEth = parseFloat(ethers.formatEther(baseBal));
       SERVER_STATS.spotBase.nativeGasETH = bEth.toFixed(6);
-      totalEth += bEth;
     }
     if (arbBal != null) {
       const aEth = parseFloat(ethers.formatEther(arbBal));
       SERVER_STATS.spotBase.nativeGasArbETH = aEth.toFixed(6);
-      totalEth += aEth;
     }
+    const totalEth = parseFloat(SERVER_STATS.spotBase.nativeGasETH || '0') + parseFloat(SERVER_STATS.spotBase.nativeGasArbETH || '0');
     if (totalEth > 0) {
       SERVER_STATS.spotBase.balanceUSD = parseFloat((totalEth * ethPrice).toFixed(2));
     }

@@ -7,7 +7,6 @@ import { startServer, setSwarmManager } from './server';
 import { logger } from './utils/logger';
 import { telegramNotifier } from './notifications/telegramNotifier';
 import { loadPersistedStats } from './utils/statsStore';
-import { Permit2ApprovalManager } from './executor/permit2ApprovalManager';
 import { SweetSpotOptimizer } from './math/sweetSpotOptimizer';
 import { ArbitrumSequencerFeedListener, BaseFlashblockFeedListener } from './mempool/mempoolListener';
 
@@ -16,12 +15,12 @@ async function main() {
   loadPersistedStats();
 
   logger.divider();
-  logger.info('🚀 INICIANDO MOTOR DE ARBITRAJE ATÓMICO V2 (100% DATOS REALES ON-CHAIN)');
-  logger.info('   Motores Activos: LowFeeExecutor (8453/42161) | SpotExecutor (8453) | ArbitrumExecutor (42161)');
+  logger.info('🚀 INICIANDO MOTOR DE ARBITRAJE ATÓMICO V2 (100% PURE FLASH LOAN ON-CHAIN)');
+  logger.info('   Motores Activos: LowFeeExecutor (8453/42161) | BaseFlashExecutor (8453) | ArbitrumExecutor (42161)');
   logger.info(`   Contratos Auditados: Base ${ENV.arbitrageContractBase} | Arbitrum ${ENV.arbitrageContractArbitrum}`);
   logger.info(`   Modo Operativo: ${ENV.dryRun ? 'DRY_RUN=true (Simulación Real con staticCall + estimateGas)' : 'LIVE MAINNET (Ejecución Real On-Chain)'}`);
   logger.info(`   Ganancia Mínima Objetivo: $${ENV.minProfitUSD.toFixed(2)} USD`);
-  logger.info('   Optimizaciones MEV: Sweet Spot Loan Search | Balancer 0% Fee | Arbitrum Sequencer Feed | Base Flashblocks');
+  logger.info('   Optimizaciones MEV: 0% Capital Propio | Balancer 0% Fee / Aave V3 | Arbitrum Sequencer Feed | Base Flashblocks');
   logger.divider();
 
   // 1. Inicializar Gestor de RPCs y cargar Chainlist.org
@@ -38,11 +37,7 @@ async function main() {
     SweetSpotOptimizer.updateL1GasFees(baseProvider, arbProvider).catch(() => {});
   }, 30000);
 
-  // 3. Garantizar autorizaciones de Uniswap Permit2 y preparar Ejecutores
-  const permit2Manager = new Permit2ApprovalManager(rpcManager);
-  await permit2Manager.ensureAllPermit2Approvals().catch((e) => {
-    logger.warn(`Fallo no-bloqueante en Permit2 approvals: ${e.message}`);
-  });
+  // 3. Preparar Ejecutores 100% Flash Loan (Sin aprobaciones Permit2 ni gasto de tokens de cartera)
 
   const { spotExecutor } = require('./executor/spotExecutor');
   await spotExecutor.initialize().catch((e: any) => {

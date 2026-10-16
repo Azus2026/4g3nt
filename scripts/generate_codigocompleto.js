@@ -24,8 +24,14 @@ const filesToInclude = [
 
   // 3. Motores de Optimización Matemática y L1 Data Fee
   'src/math/sweetSpotOptimizer.ts',
+  'src/math/economicMath.ts',
 
-  // 4. Ejecutores de Arbitraje
+  // 4. Servicios Centralizados de Despacho y Proveedores
+  'src/services/flashLoanProviderService.ts',
+  'src/services/transactionDispatcher.ts',
+  'src/utils/executionLedger.ts',
+
+  // 5. Ejecutores de Arbitraje
   'src/executor/spotExecutor.ts',
   'src/executor/arbitrumExecutor.ts',
   'src/executor/lowFeeExecutor.ts',
@@ -33,7 +39,7 @@ const filesToInclude = [
   'src/executor/permit2ApprovalManager.ts',
   'src/executor/flashBundleAccumulator.ts',
 
-  // 5. Infraestructura MEV, Mempool y Sequencer Feeds
+  // 6. Infraestructura MEV, Mempool y Sequencer Feeds
   'src/mempool/mempoolListener.ts',
   'src/mempool/backrunEngine.ts',
   'src/mempool/quicknodeStreamProcessor.ts',
@@ -45,23 +51,26 @@ const filesToInclude = [
   'src/scanners/intraDexFeeTierEngine.ts',
   'src/scanners/stableDepegEngine.ts',
   'src/scanners/subCentMicroArbEngine.ts',
-  'src/scanners/yulStorageLensEngine.ts',
 
-  // 6. Cluster y Swarm de Agentes
+  // 7. Cluster y Swarm de Agentes
   'src/cluster/swarmManager.ts',
   'src/cluster/agentWorker.ts',
 
-  // 7. Servidor, Notificaciones y Entrypoints
+  // 8. Servidor, Dashboard y Entrypoints
   'src/index.ts',
   'src/server.ts',
+  'public/index.html',
   'src/notifications/telegramNotifier.ts',
   'src/utils/logger.ts',
   'src/utils/statsStore.ts',
   'src/utils/historyStore.ts',
 
-  // 8. Scripts de Despliegue y Suites de Pruebas
-  'scripts/test_phases_verification.ts',
-  'scripts/test_fork_simulation.ts',
+  // 9. Suites de Pruebas de las 5 Fases
+  'scripts/test_phase1_zero_principal_safety.ts',
+  'test/Phase2_ContractHardening.test.ts',
+  'scripts/test_phase3_base_routes_liquidity.ts',
+  'scripts/test_phase4_economic_math_simulation.ts',
+  'scripts/test_phase5_dispatch_gas_guard.ts',
   'scripts/deployBase.ts',
   'scripts/deployArbitrum.ts'
 ];

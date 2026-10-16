@@ -5,6 +5,7 @@ import axios from 'axios';
 import { TokenConfig } from '../config/registry';
 import { ENV } from '../config/env';
 import { logger } from '../utils/logger';
+import { flashLoanProviderService } from '../services/flashLoanProviderService';
 
 export interface DEXQuote {
   protocolId: string;
@@ -99,8 +100,29 @@ export class ProtocolinkClient {
     const apiToken = this.toApiToken(token, chainId);
     const loans = [{ token: apiToken, amount: amount }];
 
+    let chosenProvider: 'balancer' | 'aave' = 'balancer';
+    if (chainId === 8453 || chainId === 42161) {
+      try {
+        const provider = getProvider(chainId);
+        const parsedAmount = ethers.parseUnits(amount, token.decimals || 18);
+        const info = await flashLoanProviderService.selectOptimalProvider(
+          chainId,
+          token.address,
+          parsedAmount,
+          provider
+        );
+        chosenProvider = info.provider;
+      } catch {
+        const providerPref = (ENV.flashLoanProvider || 'balancer').toLowerCase();
+        chosenProvider = (providerPref === 'balancer' || providerPref === 'balancerv2') ? 'balancer' : 'aave';
+      }
+    } else {
+      const providerPref = (ENV.flashLoanProvider || 'balancer').toLowerCase();
+      chosenProvider = (providerPref === 'balancer' || providerPref === 'balancerv2') ? 'balancer' : 'aave';
+    }
+
     try {
-      if (ENV.flashLoanProvider === 'balancerv2' && (chainId === 1 || chainId === 42161)) {
+      if (chosenProvider === 'balancer' && (chainId === 1 || chainId === 42161 || chainId === 8453)) {
         return api.protocols.balancerv2.newFlashLoanLogicPair(loans);
       }
       return api.protocols.aavev3.newFlashLoanLogicPair(loans);
@@ -461,12 +483,15 @@ export class ProtocolinkClient {
     const logic2 = leg2.logic || await this.getProtocolinkLogic(chainId, leg2);
 
     if (logic1 && logic2) {
-      // Validar estrictamente que el retorno cubra el préstamo flash
+      // Validar estrictamente que el retorno cubra el préstamo flash + comisión del proveedor
       if (logic2.fields && logic2.fields.output && logic2.fields.output.amount) {
         const outNum = parseFloat(logic2.fields.output.amount);
         const inNum = parseFloat(flashLoanAmount);
-        if (outNum < inNum) {
-          logger.warn(`⚠️ [ARBITRAJE INVIABLE] Retorno real de leg2 (${outNum}) menor que préstamo flash (${inNum}). Transacción abortada preventivamente.`);
+        const isAaveLoan = (flashLoanLoanLogic as any)?.protocolId?.toLowerCase().includes('aave') || (flashLoanLoanLogic as any)?.rid?.toLowerCase().includes('aave');
+        const feeRate = isAaveLoan ? 0.0005 : 0;
+        const totalRequired = inNum * (1 + feeRate);
+        if (outNum < totalRequired) {
+          logger.warn(`⚠️ [ARBITRAJE INVIABLE] Retorno real (${outNum}) menor que préstamo + comisión (${totalRequired}). Abortado.`);
           return { logics: [], routerData: null };
         }
       }
@@ -495,25 +520,8 @@ export class ProtocolinkClient {
         }
       } catch (err: any) {
         const detail = err.response && err.response.data ? JSON.stringify(err.response.data) : err.message;
-        logger.warn(`Falló la construcción atómica del router en Chain ${chainId} (${detail}). Intentando enrutamiento On-Chain directo...`);
+        logger.warn(`Falló la construcción atómica del router Flash Loan en Chain ${chainId} (${detail}). Ciclo abortado por seguridad (0% capital propio).`);
       }
-    }
-
-    // Fallback On-Chain Directo (0ms, 100% resiliente sin depender de APIs de agregadores)
-    const directTx = this.buildDirectUniswapV3Transaction(
-      account,
-      chainId,
-      leg1.inputToken,
-      leg1.outputToken,
-      flashLoanAmount,
-      500
-    );
-    if (directTx && directTx.to && directTx.data) {
-      logger.success(`✅ Router On-Chain Directo generado exitosamente para Chain ${chainId}.`);
-      return {
-        logics: [],
-        routerData: directTx,
-      };
     }
 
     return { logics: [], routerData: null };
@@ -627,87 +635,5 @@ export class ProtocolinkClient {
     }
 
     return { logics: [], routerData: null };
-  }
-
-  /**
-   * Construye transacción de Swap directa con la API nativa de ParaSwap
-   */
-  async buildDirectParaSwapTransaction(
-    account: string,
-    chainId: number,
-    tokenIn: TokenConfig,
-    tokenOut: TokenConfig,
-    amountIn: string
-  ): Promise<any | null> {
-    try {
-      const rawAmount = ethers.parseUnits(amountIn, tokenIn.decimals).toString();
-      const priceUrl = `https://apiv5.paraswap.io/prices/?srcToken=${tokenIn.address}&destToken=${tokenOut.address}&amount=${rawAmount}&srcDecimals=${tokenIn.decimals}&destDecimals=${tokenOut.decimals}&side=SELL&network=${chainId}&excludeDEXS=Dexalot`;
-      const res = await axios.get(priceUrl, { timeout: 5000 });
-      const priceRoute = res.data.priceRoute;
-      if (!priceRoute) return null;
-
-      const txBuildUrl = `https://apiv5.paraswap.io/transactions/${chainId}?ignoreChecks=true`;
-      const txRes = await axios.post(txBuildUrl, {
-        srcToken: tokenIn.address,
-        destToken: tokenOut.address,
-        srcAmount: rawAmount,
-        destAmount: priceRoute.destAmount,
-        priceRoute,
-        userAddress: account,
-        partner: 'paraswap',
-      }, { timeout: 5000 });
-
-      return txRes.data;
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Generación On-Chain Instantánea (0ms) de Calldata para Uniswap V3 Router
-   */
-  buildDirectUniswapV3Transaction(
-    account: string,
-    chainId: number,
-    tokenIn: TokenConfig,
-    tokenOut: TokenConfig,
-    amountIn: string,
-    feeTier: number = 500
-  ): any | null {
-    const UNISWAP_V3_ROUTERS: Record<number, string> = {
-      1: '0xE592427A0AEce92De3Edee1F18E0157C05861564',
-      42161: '0xE592427A0AEce92De3Edee1F18E0157C05861564',
-      10: '0xE592427A0AEce92De3Edee1F18E0157C05861564',
-      8453: '0x2626664c2603336E57B271c5C0b26F421741e481',
-    };
-
-    const routerAddress = UNISWAP_V3_ROUTERS[chainId];
-    if (!routerAddress) return null;
-
-    try {
-      const rawAmount = ethers.parseUnits(amountIn, tokenIn.decimals);
-      const iface = new ethers.Interface([
-        'function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 deadline, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) payable returns (uint256 amountOut)',
-      ]);
-
-      const calldata = iface.encodeFunctionData('exactInputSingle', [{
-        tokenIn: tokenIn.address,
-        tokenOut: tokenOut.address,
-        fee: feeTier,
-        recipient: account,
-        deadline: Math.floor(Date.now() / 1000) + 180,
-        amountIn: rawAmount,
-        amountOutMinimum: 0,
-        sqrtPriceLimitX96: 0,
-      }]);
-
-      return {
-        to: routerAddress,
-        data: calldata,
-        value: '0x0',
-      };
-    } catch {
-      return null;
-    }
   }
 }

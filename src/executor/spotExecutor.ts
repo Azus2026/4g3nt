@@ -3,8 +3,12 @@ import { ENV } from '../config/env';
 import { logger } from '../utils/logger';
 import { SERVER_STATS, addScanLog, addSpotOpportunity, addFlashOpportunity } from '../server';
 import { savePersistedStats } from '../utils/statsStore';
+import { executionLedger } from '../utils/executionLedger';
 import { SweetSpotOptimizer } from '../math/sweetSpotOptimizer';
 import { cexLagPredictor } from '../scanners/cexLagPredictor';
+import { flashLoanProviderService } from '../services/flashLoanProviderService';
+import { EconomicMath } from '../math/economicMath';
+import { transactionDispatcher } from '../services/transactionDispatcher';
 
 const getEthPriceUSD = (): number => cexLagPredictor.getCEXPrice('ETH') || 2500;
 
@@ -74,21 +78,16 @@ export const SPATIAL_PAIRS_BASE = VOLATILE_TOKENS_BASE.map(t => ({
     { buyDex: DEX_IDS.UNIV3, sellDex: DEX_IDS.AERO_V2_VOLATILE, feeBuy: t.feeUni, feeSell: 0 },
     { buyDex: DEX_IDS.AERO_CL, sellDex: DEX_IDS.AERO_V2_VOLATILE, feeBuy: t.spacingAero, feeSell: 0 },
     { buyDex: DEX_IDS.AERO_V2_VOLATILE, sellDex: DEX_IDS.AERO_CL, feeBuy: 0, feeSell: t.spacingAero },
-    { buyDex: DEX_IDS.PANCAKE_V3, sellDex: DEX_IDS.AERO_V2_VOLATILE, feeBuy: t.feeUni, feeSell: 0 },
-    { buyDex: DEX_IDS.AERO_V2_VOLATILE, sellDex: DEX_IDS.PANCAKE_V3, feeBuy: 0, feeSell: t.feeUni },
-    { buyDex: DEX_IDS.SUSHISWAP_V3, sellDex: DEX_IDS.UNIV3, feeBuy: t.feeUni, feeSell: t.feeUni },
-    { buyDex: DEX_IDS.UNIV3, sellDex: DEX_IDS.SUSHISWAP_V3, feeBuy: t.feeUni, feeSell: t.feeUni },
+      ...(ENV.enableSecondaryDex ? [
+        { buyDex: DEX_IDS.PANCAKE_V3, sellDex: DEX_IDS.AERO_V2_VOLATILE, feeBuy: t.feeUni, feeSell: 0 },
+        { buyDex: DEX_IDS.AERO_V2_VOLATILE, sellDex: DEX_IDS.PANCAKE_V3, feeBuy: 0, feeSell: t.feeUni },
+        { buyDex: DEX_IDS.SUSHISWAP_V3, sellDex: DEX_IDS.UNIV3, feeBuy: t.feeUni, feeSell: t.feeUni },
+        { buyDex: DEX_IDS.UNIV3, sellDex: DEX_IDS.SUSHISWAP_V3, feeBuy: t.feeUni, feeSell: t.feeUni },
+      ] : [])
   ]
 }));
 
-// Montos Dinámicos Multi-Tier con Búsqueda de Tamaño Óptimo
-export const SPOT_AMOUNT_TIERS = [
-  ethers.parseEther('0.003'),
-  ethers.parseEther('0.006'),
-  ethers.parseEther('0.010'),
-  ethers.parseEther('0.014'),
-];
-
+// Montos Dinámicos Multi-Tier de Flash Loans (0% Capital Propio)
 export const FLASH_AMOUNT_TIERS = [
   ethers.parseEther('0.5'),
   ethers.parseEther('1.5'),
@@ -100,15 +99,11 @@ export const FLASH_AMOUNT_TIERS = [
 ];
 
 export const ARBITRAGE_ABI = [
-  'function executeSpotSpatial((address tokenIn, address tokenIntermediate, uint8 dexBuy, uint8 dexSell, uint24 feeOrSpacingBuy, uint24 feeOrSpacingSell, uint256 minProfit) route, uint256 amountIn) external returns (uint256 profit)',
-  'function executeSpotTriangular((address tokenA, address tokenB, address tokenC, uint8 dex1, uint8 dex2, uint8 dex3, uint24 feeOrSpacing1, uint24 feeOrSpacing2, uint24 feeOrSpacing3, uint256 minProfit) route, uint256 amountIn) external returns (uint256 profit)',
   'function executeFlashLoanSpatial((address tokenIn, address tokenIntermediate, uint8 dexBuy, uint8 dexSell, uint24 feeOrSpacingBuy, uint24 feeOrSpacingSell, uint256 minProfit) route, uint256 loanAmount) external returns (uint256 profit)',
   'function executeFlashLoanTriangular((address tokenA, address tokenB, address tokenC, uint8 dex1, uint8 dex2, uint8 dex3, uint24 feeOrSpacing1, uint24 feeOrSpacing2, uint24 feeOrSpacing3, uint256 minProfit) route, uint256 loanAmount) external returns (uint256 profit)',
   'function executeBalancerFlashLoanSpatial((address tokenIn, address tokenIntermediate, uint8 dexBuy, uint8 dexSell, uint24 feeOrSpacingBuy, uint24 feeOrSpacingSell, uint256 minProfit) route, uint256 loanAmount) external returns (uint256 profit)',
   'function executeBalancerFlashLoanTriangular((address tokenA, address tokenB, address tokenC, uint8 dex1, uint8 dex2, uint8 dex3, uint24 feeOrSpacing1, uint24 feeOrSpacing2, uint24 feeOrSpacing3, uint256 minProfit) route, uint256 loanAmount) external returns (uint256 profit)',
-  'event SpatialExecuted(address indexed token, uint256 amountIn, uint256 amountOut, uint256 profit)',
-  'event TriangularExecuted(address indexed token, uint256 amountIn, uint256 amountOut, uint256 profit)',
-  'event FlashLoanExecuted(address indexed asset, uint256 loanAmount, uint256 premium, uint256 netProfit)'
+  'event FlashLoanExecuted(address indexed token, uint256 loanAmount, uint256 grossProfit, uint256 timestamp)'
 ];
 
 export class SpotExecutor {
@@ -122,7 +117,7 @@ export class SpotExecutor {
   private circuitBreakerCooldownUntil: number = 0;
 
   private constructor() {
-    this.provider = new ethers.JsonRpcProvider(ENV.rpcUrl || 'https://developer-access-mainnet.base.org', 8453, {
+    this.provider = new ethers.JsonRpcProvider(ENV.rpcUrl || 'https://mainnet.base.org', 8453, {
       staticNetwork: true,
     });
 
@@ -207,7 +202,11 @@ export class SpotExecutor {
     if (Date.now() < this.circuitBreakerCooldownUntil) return false;
 
     const pathDesc = `${DEX_NAMES[buyDex]} ➔ ${DEX_NAMES[sellDex]}`;
-    const minProfit = MIN_MICRO_PROFIT_WEI;
+    const tokenDecimals = flashLoanProviderService.getStrictDecimals(tokenIn, 18);
+    const btcPrice = cexLagPredictor.getCEXPrice('BTC') || 68000;
+    const ethPrice = getEthPriceUSD();
+    const tokenPriceUSD = tokenDecimals === 6 ? 1.0 : (tokenDecimals === 8 ? btcPrice : ethPrice);
+    const minProfit = EconomicMath.calculateContractMinProfit(ENV.minProfitUsd, tokenPriceUSD, tokenDecimals);
 
     const routeStruct = {
       tokenIn,
@@ -220,196 +219,118 @@ export class SpotExecutor {
     };
 
     try {
-      // 1. Simulación Balancer V2 Vault (0% Fee)
+      // 1. Simulación Dinámica con Balancer V2 o Aave V3 según liquidez on-chain
       let profitableFlashAmount: bigint | null = null;
       let simulatedProfitWei = 0n;
       let isBalancer = false;
 
       for (const fAmount of FLASH_AMOUNT_TIERS) {
-        try {
-          const profit = await this.arbitrageContract.executeBalancerFlashLoanSpatial.staticCall(routeStruct, fAmount);
-          if (profit && BigInt(profit) > minProfit) {
-            profitableFlashAmount = fAmount;
-            simulatedProfitWei = BigInt(profit);
-            isBalancer = true;
-            break;
-          }
-        } catch {
-          // Revert normal si no hay spread
-        }
-      }
+        const provInfo = await flashLoanProviderService.selectOptimalProvider(
+          8453,
+          tokenIn,
+          fAmount,
+          this.provider
+        );
 
-      // Fallback a Aave V3 si Balancer no tiene liquidez
-      if (!profitableFlashAmount) {
-        for (const fAmount of FLASH_AMOUNT_TIERS) {
+        if (provInfo.provider === 'balancer') {
           try {
-            const profit = await this.arbitrageContract.executeFlashLoanSpatial.staticCall(routeStruct, fAmount);
+            const profit = await this.arbitrageContract.executeBalancerFlashLoanSpatial.staticCall(routeStruct, fAmount);
             if (profit && BigInt(profit) > minProfit) {
               profitableFlashAmount = fAmount;
               simulatedProfitWei = BigInt(profit);
-              isBalancer = false;
+              isBalancer = true;
               break;
             }
           } catch {}
         }
-      }
 
-      // 2. Probar Tiers de Spot
-      let profitableSpotAmount: bigint | null = null;
-      if (!profitableFlashAmount) {
-        for (const sAmount of SPOT_AMOUNT_TIERS) {
-          try {
-            const profit = await this.arbitrageContract.executeSpotSpatial.staticCall(routeStruct, sAmount);
-            if (profit && BigInt(profit) > minProfit) {
-              profitableSpotAmount = sAmount;
-              simulatedProfitWei = BigInt(profit);
-              break;
-            }
-          } catch {}
-        }
+        // Si Balancer no tiene liquidez, está en pausa o revierte, intentar Aave V3
+        try {
+          const profit = await this.arbitrageContract.executeFlashLoanSpatial.staticCall(routeStruct, fAmount);
+          if (profit && BigInt(profit) > minProfit) {
+            profitableFlashAmount = fAmount;
+            simulatedProfitWei = BigInt(profit);
+            isBalancer = false;
+            break;
+          }
+        } catch {}
       }
 
       SERVER_STATS.spotBase.scansCount++;
-      if (SERVER_STATS.flashLoans) SERVER_STATS.flashLoans.detectedOpportunitiesCount++;
 
-      // 3. Telemetría Real (0% Fórmulas Sintéticas)
-      const isProfitable = !!(profitableFlashAmount || profitableSpotAmount);
-      let formattedSpread = 0;
-      let grossUSD = 0;
-      let tradeCapUSD = 0;
+      // 3. Telemetría Real y Evaluación Económica Rigurosa (100% Flash Loan)
+      const evaluation = EconomicMath.evaluateOpportunity({
+        chainId: 8453,
+        loanTokenAddress: tokenIn,
+        loanAmount: profitableFlashAmount || FLASH_AMOUNT_TIERS[0],
+        simulatedGrossProfitUnits: simulatedProfitWei,
+        tokenPriceUSD,
+        ethPriceUSD: ethPrice,
+        calldataSizeBytes: 384,
+        slippageBufferBps: 15,
+      });
 
-      if (isProfitable && simulatedProfitWei > 0n) {
-        const ethPrice = getEthPriceUSD();
-        const realProfitETH = parseFloat(ethers.formatEther(simulatedProfitWei));
-        tradeCapUSD = profitableSpotAmount
-          ? parseFloat(ethers.formatEther(profitableSpotAmount)) * ethPrice
-          : parseFloat(ethers.formatEther(profitableFlashAmount!)) * ethPrice;
-        formattedSpread = tradeCapUSD > 0 ? parseFloat((((realProfitETH * ethPrice) / tradeCapUSD) * 100).toFixed(3)) : 0;
-        grossUSD = parseFloat((realProfitETH * ethPrice).toFixed(4));
+      if (evaluation.isProfitable && SERVER_STATS.flashLoans) {
+        SERVER_STATS.flashLoans.detectedOpportunitiesCount++;
       }
 
-      const ethPrice = getEthPriceUSD();
-      const gasEst = SweetSpotOptimizer.calculateTotalGasCostUSD(8453, 220_000n, 0.05, ethPrice, 384);
-      const gasUSD = gasEst.totalGasUSD;
-      const netUSD = isProfitable ? Math.max(0, parseFloat((grossUSD - gasUSD).toFixed(4))) : 0;
+      const formattedSpread = evaluation.loanAmountUSD > 0
+        ? parseFloat(((evaluation.grossProfitUSD / evaluation.loanAmountUSD) * 100).toFixed(3))
+        : 0;
 
       addSpotOpportunity({
         pairName: `[2-LEG] ${pairName} (${pathDesc})`,
         chainId: 8453,
-        type: 'SPOT_BASE',
+        type: 'FLASH_LOAN',
         tokenBorrow: tokenIn,
-        tokenBorrowSymbol: 'WETH',
-        loanAmount: profitableSpotAmount
-          ? `${ethers.formatEther(profitableSpotAmount)} WETH`
-          : (profitableFlashAmount ? `${ethers.formatEther(profitableFlashAmount)} WETH` : '0.014 WETH ($35 USD)'),
+        tokenBorrowSymbol: evaluation.loanTokenSymbol,
+        loanAmount: profitableFlashAmount ? `${ethers.formatUnits(profitableFlashAmount, tokenDecimals)} ${evaluation.loanTokenSymbol}` : `0.5 ${evaluation.loanTokenSymbol} (Flash)`,
         leg1: { protocolId: DEX_NAMES[buyDex].toLowerCase(), price: 2500 },
         leg2: { protocolId: DEX_NAMES[sellDex].toLowerCase(), price: 2500 },
         spreadPercent: formattedSpread,
-        grossProfitUSD: grossUSD,
-        gasCostUSD: gasUSD,
-        netProfitUSD: netUSD,
+        grossProfitUSD: evaluation.grossProfitUSD,
+        gasCostUSD: evaluation.totalGasCostUSD,
+        netProfitUSD: evaluation.netProfitUSD,
         timestamp: Date.now(),
-        isProfitable,
+        isProfitable: evaluation.isProfitable,
         contractAddress: ARBITRAGE_CONTRACT_BASE,
       });
 
-      // 4. Disparo On-Chain con Pre-Flight EstimateGas
-      if (profitableFlashAmount && netUSD > 0.15) {
+      // 4. Disparo Centralizado con Mutex, Pre-Flight y Gas Guard (Exclusivamente Flash Loan)
+      if (profitableFlashAmount && evaluation.isProfitable) {
         this.isExecuting = true;
-        const providerName = isBalancer ? 'Balancer V2 (0% Fee)' : 'Aave V3';
-
-        // Pre-Flight Check de Gas
-        let gasEstimated: bigint;
         try {
-          gasEstimated = isBalancer
-            ? await this.arbitrageContract.executeBalancerFlashLoanSpatial.estimateGas(routeStruct, profitableFlashAmount)
-            : await this.arbitrageContract.executeFlashLoanSpatial.estimateGas(routeStruct, profitableFlashAmount);
-        } catch (estErr: any) {
-          logger.warn(`⚠️ [PRE-FLIGHT ABORT] Oportunidad expiró antes del minado: ${estErr.message}`);
+          const result = await transactionDispatcher.dispatchSpatial({
+            chainId: 8453,
+            pairName: `[2-LEG] ${pairName} (${pathDesc})`,
+            provider: isBalancer ? 'balancer' : 'aave',
+            contract: this.arbitrageContract,
+            routeStruct,
+            loanAmount: profitableFlashAmount,
+            evaluation,
+          });
+
+          if (result.success) {
+            this.consecutiveErrors = 0;
+            if (!result.simulated) {
+              SERVER_STATS.spotBase.executedCount++;
+              SERVER_STATS.spotBase.realizedPnLUSD += result.realizedNetProfitUSD ?? evaluation.netProfitUSD;
+              SERVER_STATS.flashLoans.onChainExecutedCount++;
+              SERVER_STATS.flashLoans.detectedPnLUSD += result.realizedNetProfitUSD ?? evaluation.netProfitUSD;
+              savePersistedStats();
+              return true;
+            } else {
+              SERVER_STATS.spotBase.simulatedCount++;
+              SERVER_STATS.spotBase.simulatedPnLUSD += evaluation.netProfitUSD;
+              SERVER_STATS.flashLoans.simulatedCount++;
+              SERVER_STATS.flashLoans.simulatedPnLUSD += evaluation.netProfitUSD;
+              savePersistedStats();
+            }
+          } else if (result.reason) {
+            this.handleRevert(result.reason);
+          }
+        } finally {
           this.isExecuting = false;
-          return false;
-        }
-
-        const gasLimit = (gasEstimated * 115n) / 100n;
-        logger.success(`🔥 [FLASH LOAN ${providerName}] Oportunidad en ${pairName} | ${pathDesc} (${ethers.formatEther(profitableFlashAmount)} WETH)!`);
-
-        if (ENV.dryRun) {
-          logger.info(`🧪 [DRY RUN VALIDADO] Flash Loan ${providerName} en ${pairName} | Spread: ${formattedSpread}% | Net: +$${netUSD} USD | Gas estimado: $${gasUSD}. Omitiendo tx real.`);
-          addScanLog(`🧪 [DRY RUN] Oportunidad validada en ${pairName} (Net: +$${netUSD} USD).`);
-          this.consecutiveErrors = 0;
-          SERVER_STATS.flashLoans.onChainExecutedCount++;
-          SERVER_STATS.flashLoans.detectedPnLUSD += netUSD;
-          SERVER_STATS.spotBase.executedCount++;
-          SERVER_STATS.spotBase.realizedPnLUSD += netUSD;
-          savePersistedStats();
-          this.isExecuting = false;
-          return true;
-        }
-
-        addScanLog(`🚀 [DISPARO ON-CHAIN] Flash Loan ${providerName} ${pairName} (${pathDesc})...`);
-
-        const tx = isBalancer
-          ? await this.arbitrageContract.executeBalancerFlashLoanSpatial(routeStruct, profitableFlashAmount, { gasLimit })
-          : await this.arbitrageContract.executeFlashLoanSpatial(routeStruct, profitableFlashAmount, { gasLimit });
-
-        logger.info(`⚡ Tx Enviada: https://basescan.org/tx/${tx.hash}`);
-        const receipt = await tx.wait(1);
-
-        if (receipt && receipt.status === 1) {
-          logger.success(`🎉 [FLASH LOAN CONFIRMADO] Bloque #${receipt.blockNumber}!`);
-          addScanLog(`🎉 [CONFIRMADA] Flash Loan Ejecutado Bloque #${receipt.blockNumber} | Tx: https://basescan.org/tx/${tx.hash}`);
-
-          this.consecutiveErrors = 0;
-          SERVER_STATS.flashLoans.onChainExecutedCount++;
-          SERVER_STATS.flashLoans.detectedPnLUSD += netUSD;
-          SERVER_STATS.spotBase.executedCount++;
-          SERVER_STATS.spotBase.realizedPnLUSD += netUSD;
-          savePersistedStats();
-          this.isExecuting = false;
-          return true;
-        } else {
-          this.handleRevert('Flash Loan Spatial Reverted');
-        }
-      } else if (profitableSpotAmount && netUSD > 0.05) {
-        this.isExecuting = true;
-
-        let gasEstimated: bigint;
-        try {
-          gasEstimated = await this.arbitrageContract.executeSpotSpatial.estimateGas(routeStruct, profitableSpotAmount);
-        } catch (estErr: any) {
-          logger.warn(`⚠️ [PRE-FLIGHT SPOT ABORT] Oportunidad expiró: ${estErr.message}`);
-          this.isExecuting = false;
-          return false;
-        }
-
-        const gasLimit = (gasEstimated * 115n) / 100n;
-        logger.success(`🔥 [SPOT ESPACIAL DETECTADO] Oportunidad en ${pairName} | ${pathDesc} (${ethers.formatEther(profitableSpotAmount)} WETH)!`);
-
-        if (ENV.dryRun) {
-          logger.info(`🧪 [DRY RUN VALIDADO] Spot Espacial en ${pairName} | Net: +$${netUSD} USD. Omitiendo tx real.`);
-          addScanLog(`🧪 [DRY RUN] Spot validado en ${pairName} (Net: +$${netUSD} USD).`);
-          this.consecutiveErrors = 0;
-          SERVER_STATS.spotBase.executedCount++;
-          SERVER_STATS.spotBase.realizedPnLUSD += netUSD;
-          savePersistedStats();
-          this.isExecuting = false;
-          return true;
-        }
-
-        const tx = await this.arbitrageContract.executeSpotSpatial(routeStruct, profitableSpotAmount, { gasLimit });
-        logger.info(`⚡ Tx Enviada: https://basescan.org/tx/${tx.hash}`);
-        const receipt = await tx.wait(1);
-
-        if (receipt && receipt.status === 1) {
-          logger.success(`🎉 [SPOT CONFIRMADO] Bloque #${receipt.blockNumber}!`);
-          this.consecutiveErrors = 0;
-          SERVER_STATS.spotBase.executedCount++;
-          SERVER_STATS.spotBase.realizedPnLUSD += netUSD;
-          savePersistedStats();
-          this.isExecuting = false;
-          return true;
-        } else {
-          this.handleRevert('Spot Spatial Reverted');
         }
       } else {
         addScanLog(`🔍 [2-LEG ESPACIAL] ${pairName} | ${pathDesc} | Saldo Protegido (0 riesgo)`);
@@ -427,7 +348,7 @@ export class SpotExecutor {
   }
 
   /**
-   * Escanea y Ejecuta Arbitraje Triangular 3-Leg con Simulación Real y Pre-Flight Check
+   * Escanea y Ejecuta Arbitraje Triangular 3-Leg con Simulación Real y Pre-Flight Check (100% Flash Loan)
    */
   public async scanAndExecuteTriangular(
     pairName: string,
@@ -445,7 +366,9 @@ export class SpotExecutor {
     if (Date.now() < this.circuitBreakerCooldownUntil) return false;
 
     const pathDesc = `${DEX_NAMES[dex1]} ➔ ${DEX_NAMES[dex2]} ➔ ${DEX_NAMES[dex3]}`;
-    const minProfit = MIN_MICRO_PROFIT_WEI;
+    const tokenDecimals = 18;
+    const triEthPrice = getEthPriceUSD();
+    const minProfit = EconomicMath.calculateContractMinProfit(ENV.minProfitUsd, triEthPrice, tokenDecimals);
 
     const routeStruct = {
       tokenA,
@@ -466,177 +389,111 @@ export class SpotExecutor {
       let isBalancer = false;
 
       for (const fAmount of FLASH_AMOUNT_TIERS) {
+        const provInfo = await flashLoanProviderService.selectOptimalProvider(
+          8453,
+          tokenA,
+          fAmount,
+          this.provider
+        );
+
+        if (provInfo.provider === 'balancer') {
+          try {
+            const profit = await this.arbitrageContract.executeBalancerFlashLoanTriangular.staticCall(routeStruct, fAmount);
+            if (profit && BigInt(profit) > minProfit) {
+              profitableFlashAmount = fAmount;
+              simulatedProfitWei = BigInt(profit);
+              isBalancer = true;
+              break;
+            }
+          } catch {}
+        }
+
         try {
-          const profit = await this.arbitrageContract.executeBalancerFlashLoanTriangular.staticCall(routeStruct, fAmount);
+          const profit = await this.arbitrageContract.executeFlashLoanTriangular.staticCall(routeStruct, fAmount);
           if (profit && BigInt(profit) > minProfit) {
             profitableFlashAmount = fAmount;
             simulatedProfitWei = BigInt(profit);
-            isBalancer = true;
+            isBalancer = false;
             break;
           }
         } catch {}
       }
 
-      if (!profitableFlashAmount) {
-        for (const fAmount of FLASH_AMOUNT_TIERS) {
-          try {
-            const profit = await this.arbitrageContract.executeFlashLoanTriangular.staticCall(routeStruct, fAmount);
-            if (profit && BigInt(profit) > minProfit) {
-              profitableFlashAmount = fAmount;
-              simulatedProfitWei = BigInt(profit);
-              isBalancer = false;
-              break;
-            }
-          } catch {}
-        }
-      }
-
-      let profitableSpotAmount: bigint | null = null;
-      if (!profitableFlashAmount) {
-        for (const sAmount of SPOT_AMOUNT_TIERS) {
-          try {
-            const profit = await this.arbitrageContract.executeSpotTriangular.staticCall(routeStruct, sAmount);
-            if (profit && BigInt(profit) > minProfit) {
-              profitableSpotAmount = sAmount;
-              simulatedProfitWei = BigInt(profit);
-              break;
-            }
-          } catch {}
-        }
-      }
-
       SERVER_STATS.spotBase.scansCount++;
-      if (SERVER_STATS.flashLoans) SERVER_STATS.flashLoans.detectedOpportunitiesCount++;
 
-      const isProfitable = !!(profitableFlashAmount || profitableSpotAmount);
-      let formattedTriSpread = 0;
-      let triGrossUSD = 0;
-      let triCapUSD = 0;
+      // 3. Telemetría Real y Evaluación Económica Rigurosa (100% Flash Loan)
+      const evaluation = EconomicMath.evaluateOpportunity({
+        chainId: 8453,
+        loanTokenAddress: tokenA,
+        loanAmount: profitableFlashAmount || FLASH_AMOUNT_TIERS[0],
+        simulatedGrossProfitUnits: simulatedProfitWei,
+        tokenPriceUSD: triEthPrice,
+        ethPriceUSD: triEthPrice,
+        calldataSizeBytes: 512,
+        slippageBufferBps: 15,
+      });
 
-      if (isProfitable && simulatedProfitWei > 0n) {
-        const ethPrice = getEthPriceUSD();
-        const realProfitETH = parseFloat(ethers.formatEther(simulatedProfitWei));
-        triCapUSD = profitableSpotAmount
-          ? parseFloat(ethers.formatEther(profitableSpotAmount)) * ethPrice
-          : parseFloat(ethers.formatEther(profitableFlashAmount!)) * ethPrice;
-        formattedTriSpread = triCapUSD > 0 ? parseFloat((((realProfitETH * ethPrice) / triCapUSD) * 100).toFixed(3)) : 0;
-        triGrossUSD = parseFloat((realProfitETH * ethPrice).toFixed(4));
+      if (evaluation.isProfitable && SERVER_STATS.flashLoans) {
+        SERVER_STATS.flashLoans.detectedOpportunitiesCount++;
       }
 
-      const triEthPrice = getEthPriceUSD();
-      const triGasEst = SweetSpotOptimizer.calculateTotalGasCostUSD(8453, 280_000n, 0.05, triEthPrice, 512);
-      const triGasUSD = triGasEst.totalGasUSD;
-      const triNetUSD = isProfitable ? Math.max(0, parseFloat((triGrossUSD - triGasUSD).toFixed(4))) : 0;
+      const formattedTriSpread = evaluation.loanAmountUSD > 0
+        ? parseFloat(((evaluation.grossProfitUSD / evaluation.loanAmountUSD) * 100).toFixed(3))
+        : 0;
 
       addSpotOpportunity({
         pairName: `[3-LEG] ${pairName} (${pathDesc})`,
         chainId: 8453,
-        type: 'SPOT_BASE',
+        type: 'FLASH_LOAN',
         tokenBorrow: tokenA,
         tokenBorrowSymbol: 'WETH',
-        loanAmount: profitableSpotAmount
-          ? `${ethers.formatEther(profitableSpotAmount)} WETH`
-          : (profitableFlashAmount ? `${ethers.formatEther(profitableFlashAmount)} WETH` : '0.014 WETH ($35 USD)'),
+        loanAmount: profitableFlashAmount ? `${ethers.formatEther(profitableFlashAmount)} WETH` : '0.5 WETH (Flash)',
         leg1: { protocolId: DEX_NAMES[dex1].toLowerCase(), price: 2500 },
         leg2: { protocolId: DEX_NAMES[dex2].toLowerCase(), price: 2500 },
         spreadPercent: formattedTriSpread,
-        grossProfitUSD: triGrossUSD,
-        gasCostUSD: triGasUSD,
-        netProfitUSD: triNetUSD,
+        grossProfitUSD: evaluation.grossProfitUSD,
+        gasCostUSD: evaluation.totalGasCostUSD,
+        netProfitUSD: evaluation.netProfitUSD,
         timestamp: Date.now(),
-        isProfitable,
+        isProfitable: evaluation.isProfitable,
         contractAddress: ARBITRAGE_CONTRACT_BASE,
       });
 
-      if (profitableFlashAmount && triNetUSD > 0.20) {
+      // 4. Disparo Centralizado con Mutex, Pre-Flight y Gas Guard (Exclusivamente Flash Loan)
+      if (profitableFlashAmount && evaluation.isProfitable) {
         this.isExecuting = true;
-        const providerName = isBalancer ? 'Balancer V2 (0% Fee)' : 'Aave V3';
-
-        let gasEstimated: bigint;
         try {
-          gasEstimated = isBalancer
-            ? await this.arbitrageContract.executeBalancerFlashLoanTriangular.estimateGas(routeStruct, profitableFlashAmount)
-            : await this.arbitrageContract.executeFlashLoanTriangular.estimateGas(routeStruct, profitableFlashAmount);
-        } catch (estErr: any) {
-          logger.warn(`⚠️ [PRE-FLIGHT TRIANGULAR ABORT] ${estErr.message}`);
+          const result = await transactionDispatcher.dispatchTriangular({
+            chainId: 8453,
+            pairName: `[3-LEG] ${pairName} (${pathDesc})`,
+            provider: isBalancer ? 'balancer' : 'aave',
+            contract: this.arbitrageContract,
+            routeStruct,
+            loanAmount: profitableFlashAmount,
+            evaluation,
+          });
+
+          if (result.success) {
+            this.consecutiveErrors = 0;
+            if (!result.simulated) {
+              SERVER_STATS.spotBase.executedCount++;
+              SERVER_STATS.spotBase.realizedPnLUSD += result.realizedNetProfitUSD ?? evaluation.netProfitUSD;
+              SERVER_STATS.flashLoans.onChainExecutedCount++;
+              SERVER_STATS.flashLoans.detectedPnLUSD += result.realizedNetProfitUSD ?? evaluation.netProfitUSD;
+              savePersistedStats();
+              return true;
+            } else {
+              SERVER_STATS.spotBase.simulatedCount++;
+              SERVER_STATS.spotBase.simulatedPnLUSD += evaluation.netProfitUSD;
+              SERVER_STATS.flashLoans.simulatedCount++;
+              SERVER_STATS.flashLoans.simulatedPnLUSD += evaluation.netProfitUSD;
+              savePersistedStats();
+            }
+          } else if (result.reason) {
+            this.handleRevert(result.reason);
+          }
+        } finally {
           this.isExecuting = false;
-          return false;
-        }
-
-        const gasLimit = (gasEstimated * 115n) / 100n;
-        logger.success(`🔥 [FLASH LOAN ${providerName} TRIANGULAR] ${pairName} (${ethers.formatEther(profitableFlashAmount)} WETH)!`);
-
-        if (ENV.dryRun) {
-          logger.info(`🧪 [DRY RUN VALIDADO] Flash Loan Triangular ${providerName} en ${pairName} | Net: +$${triNetUSD} USD. Omitiendo tx real.`);
-          addScanLog(`🧪 [DRY RUN] Flash Triangular validado en ${pairName} (Net: +$${triNetUSD} USD).`);
-          this.consecutiveErrors = 0;
-          SERVER_STATS.flashLoans.onChainExecutedCount++;
-          SERVER_STATS.flashLoans.detectedPnLUSD += triNetUSD;
-          SERVER_STATS.spotBase.executedCount++;
-          SERVER_STATS.spotBase.realizedPnLUSD += triNetUSD;
-          savePersistedStats();
-          this.isExecuting = false;
-          return true;
-        }
-
-        const tx = isBalancer
-          ? await this.arbitrageContract.executeBalancerFlashLoanTriangular(routeStruct, profitableFlashAmount, { gasLimit })
-          : await this.arbitrageContract.executeFlashLoanTriangular(routeStruct, profitableFlashAmount, { gasLimit });
-
-        logger.info(`⚡ Tx Enviada: https://basescan.org/tx/${tx.hash}`);
-        const receipt = await tx.wait(1);
-
-        if (receipt && receipt.status === 1) {
-          logger.success(`🎉 [FLASH LOAN TRIANGULAR CONFIRMADO] Bloque #${receipt.blockNumber}!`);
-          this.consecutiveErrors = 0;
-          SERVER_STATS.flashLoans.onChainExecutedCount++;
-          SERVER_STATS.flashLoans.detectedPnLUSD += triNetUSD;
-          SERVER_STATS.spotBase.executedCount++;
-          SERVER_STATS.spotBase.realizedPnLUSD += triNetUSD;
-          savePersistedStats();
-          this.isExecuting = false;
-          return true;
-        } else {
-          this.handleRevert('Flash Loan Triangular Reverted');
-        }
-      } else if (profitableSpotAmount && triNetUSD > 0.08) {
-        this.isExecuting = true;
-
-        let gasEstimated: bigint;
-        try {
-          gasEstimated = await this.arbitrageContract.executeSpotTriangular.estimateGas(routeStruct, profitableSpotAmount);
-        } catch (estErr: any) {
-          logger.warn(`⚠️ [PRE-FLIGHT TRI SPOT ABORT] ${estErr.message}`);
-          this.isExecuting = false;
-          return false;
-        }
-
-        const gasLimit = (gasEstimated * 115n) / 100n;
-
-        if (ENV.dryRun) {
-          logger.info(`🧪 [DRY RUN VALIDADO] Spot Triangular en ${pairName} | Net: +$${triNetUSD} USD. Omitiendo tx real.`);
-          addScanLog(`🧪 [DRY RUN] Spot Triangular validado en ${pairName} (Net: +$${triNetUSD} USD).`);
-          this.consecutiveErrors = 0;
-          SERVER_STATS.spotBase.executedCount++;
-          SERVER_STATS.spotBase.realizedPnLUSD += triNetUSD;
-          savePersistedStats();
-          this.isExecuting = false;
-          return true;
-        }
-
-        const tx = await this.arbitrageContract.executeSpotTriangular(routeStruct, profitableSpotAmount, { gasLimit });
-        const receipt = await tx.wait(1);
-
-        if (receipt && receipt.status === 1) {
-          logger.success(`🎉 [TRIANGULAR SPOT CONFIRMADO] Bloque #${receipt.blockNumber}!`);
-          this.consecutiveErrors = 0;
-          SERVER_STATS.spotBase.executedCount++;
-          SERVER_STATS.spotBase.realizedPnLUSD += triNetUSD;
-          savePersistedStats();
-          this.isExecuting = false;
-          return true;
-        } else {
-          this.handleRevert('Spot Triangular Reverted');
         }
       } else {
         addScanLog(`🔍 [3-LEG TRIANGULAR] ${pairName} | ${pathDesc} | Saldo Protegido (0 riesgo)`);

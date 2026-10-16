@@ -3,7 +3,12 @@ import { ENV } from '../config/env';
 import { logger } from '../utils/logger';
 import { SERVER_STATS, addScanLog, addLowFeeOpportunity } from '../server';
 import { savePersistedStats } from '../utils/statsStore';
+import { executionLedger } from '../utils/executionLedger';
 import { cexLagPredictor } from '../scanners/cexLagPredictor';
+import { SweetSpotOptimizer } from '../math/sweetSpotOptimizer';
+import { flashLoanProviderService } from '../services/flashLoanProviderService';
+import { EconomicMath } from '../math/economicMath';
+import { transactionDispatcher } from '../services/transactionDispatcher';
 
 // Contratos Universales
 const CONTRACT_BASE = ENV.arbitrageContractBase || '0xdA593D75439364a864a92416430FFA1268724059';
@@ -35,8 +40,10 @@ export const LOW_FEE_PAIRS_BASE = [
     routes: [
       { buyDex: 0, sellDex: 1, feeBuy: 500, feeSell: 100 },
       { buyDex: 1, sellDex: 0, feeBuy: 100, feeSell: 500 },
-      { buyDex: 0, sellDex: 4, feeBuy: 500, feeSell: 500 }, // Pancake V3 es índice 4
-      { buyDex: 4, sellDex: 0, feeBuy: 500, feeSell: 500 },
+      ...(ENV.enableSecondaryDex ? [
+        { buyDex: 0, sellDex: 4, feeBuy: 500, feeSell: 500 },
+        { buyDex: 4, sellDex: 0, feeBuy: 500, feeSell: 500 },
+      ] : []),
     ]
   },
   {
@@ -131,11 +138,9 @@ export const LOW_FEE_PAIRS_ARB = [
 ];
 
 const CONTRACT_ABI = [
-  'function executeSpotSpatial((address tokenIn, address tokenIntermediate, uint8 dexBuy, uint8 dexSell, uint24 feeOrSpacingBuy, uint24 feeOrSpacingSell, uint256 minProfit) route, uint256 amountIn) external returns (uint256 profit)',
   'function executeFlashLoanSpatial((address tokenIn, address tokenIntermediate, uint8 dexBuy, uint8 dexSell, uint24 feeOrSpacingBuy, uint24 feeOrSpacingSell, uint256 minProfit) route, uint256 loanAmount) external returns (uint256 profit)',
   'function executeBalancerFlashLoanSpatial((address tokenIn, address tokenIntermediate, uint8 dexBuy, uint8 dexSell, uint24 feeOrSpacingBuy, uint24 feeOrSpacingSell, uint256 minProfit) route, uint256 loanAmount) external returns (uint256 profit)',
-  'event SpatialExecuted(address indexed token, uint256 amountIn, uint256 amountOut, uint256 profit)',
-  'event FlashLoanExecuted(address indexed asset, uint256 loanAmount, uint256 premium, uint256 netProfit)'
+  'event FlashLoanExecuted(address indexed token, uint256 loanAmount, uint256 grossProfit, uint256 timestamp)'
 ];
 
 export class LowFeeExecutor {
@@ -152,7 +157,7 @@ export class LowFeeExecutor {
   private circuitBreakerCooldownUntil: number = 0;
 
   private constructor() {
-    this.providerBase = new ethers.JsonRpcProvider(ENV.rpcUrl || 'https://developer-access-mainnet.base.org', 8453, { staticNetwork: true });
+    this.providerBase = new ethers.JsonRpcProvider(ENV.rpcUrl || 'https://mainnet.base.org', 8453, { staticNetwork: true });
     this.providerArb = new ethers.JsonRpcProvider(ENV.arbitrumRpcUrl || 'https://arb1.arbitrum.io/rpc', 42161, { staticNetwork: true });
 
     if (ENV.privateKey && ENV.privateKey !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
@@ -206,7 +211,10 @@ export class LowFeeExecutor {
 
     const isBase = chainId === 8453;
     const contract = isBase ? this.contractBase : this.contractArb;
-    const minProfit = decimalsIn === 6 ? 100_000n : 40_000_000_000n; // $0.10 USD en token nativo
+    const ethPrice = cexLagPredictor.getCEXPrice('ETH') || 2500.0;
+    const btcPrice = cexLagPredictor.getCEXPrice('BTC') || 68000.0;
+    const priceUSD = decimalsIn === 6 ? 1.0 : (decimalsIn === 8 ? btcPrice : ethPrice);
+    const minProfit = EconomicMath.calculateContractMinProfit(ENV.minProfitUsd, priceUSD, decimalsIn);
 
     const routeStruct = {
       tokenIn,
@@ -218,83 +226,67 @@ export class LowFeeExecutor {
       minProfit
     };
 
-    // Montos escalados según decimales reales
-    const spotAmounts = decimalsIn === 6
-      ? [ethers.parseUnits('10', 6), ethers.parseUnits('25', 6), ethers.parseUnits('35', 6)]
-      : [ethers.parseEther('0.003'), ethers.parseEther('0.006'), ethers.parseEther('0.014')];
-
     const flashAmounts = decimalsIn === 6
       ? [ethers.parseUnits('2500', 6), ethers.parseUnits('5000', 6), ethers.parseUnits('15000', 6), ethers.parseUnits('50000', 6)]
-      : [ethers.parseEther('1.0'), ethers.parseEther('2.5'), ethers.parseEther('6.0'), ethers.parseEther('15.0')];
+      : (decimalsIn === 8
+        ? [ethers.parseUnits('0.05', 8), ethers.parseUnits('0.15', 8), ethers.parseUnits('0.5', 8)]
+        : [ethers.parseEther('1.0'), ethers.parseEther('2.5'), ethers.parseEther('6.0'), ethers.parseEther('15.0')]);
 
     try {
       let profitableFlash: bigint | null = null;
       let simulatedProfit = 0n;
       let isBalancer = false;
 
-      // 1. Simulación Balancer V2 (0% Fee)
+      // 1. Consulta dinámica y simulación con Balancer V2 o Aave V3 según liquidez on-chain
       for (const fAmt of flashAmounts) {
+        const provInfo = await flashLoanProviderService.selectOptimalProvider(
+          chainId,
+          tokenIn,
+          fAmt,
+          isBase ? this.providerBase : this.providerArb
+        );
+
+        if (provInfo.provider === 'balancer') {
+          try {
+            const profit = await contract.executeBalancerFlashLoanSpatial.staticCall(routeStruct, fAmt);
+            if (profit && BigInt(profit) > minProfit) {
+              profitableFlash = fAmt;
+              simulatedProfit = BigInt(profit);
+              isBalancer = true;
+              break;
+            }
+          } catch {}
+        }
+
+        // Si Balancer no tiene liquidez, está pausado o revierte, intentar Aave V3
         try {
-          const profit = await contract.executeBalancerFlashLoanSpatial.staticCall(routeStruct, fAmt);
+          const profit = await contract.executeFlashLoanSpatial.staticCall(routeStruct, fAmt);
           if (profit && BigInt(profit) > minProfit) {
             profitableFlash = fAmt;
             simulatedProfit = BigInt(profit);
-            isBalancer = true;
+            isBalancer = false;
             break;
           }
         } catch {}
       }
 
-      // Fallback a Aave V3
-      if (!profitableFlash) {
-        for (const fAmt of flashAmounts) {
-          try {
-            const profit = await contract.executeFlashLoanSpatial.staticCall(routeStruct, fAmt);
-            if (profit && BigInt(profit) > minProfit) {
-              profitableFlash = fAmt;
-              simulatedProfit = BigInt(profit);
-              isBalancer = false;
-              break;
-            }
-          } catch {}
-        }
-      }
-
-      // 2. Simulación Spot
-      let profitableSpot: bigint | null = null;
-      if (!profitableFlash) {
-        for (const sAmt of spotAmounts) {
-          try {
-            const profit = await contract.executeSpotSpatial.staticCall(routeStruct, sAmt);
-            if (profit && BigInt(profit) > minProfit) {
-              profitableSpot = sAmt;
-              simulatedProfit = BigInt(profit);
-              break;
-            }
-          } catch {}
-        }
-      }
-
       SERVER_STATS.lowFee.scansCount++;
 
-      // 3. Telemetría Real (0% Ondas Sinusoidales)
-      const isProfitable = !!(profitableFlash || profitableSpot);
-      let formattedSpread = 0;
-      let grossUSD = 0;
-      let loanUSD = 0;
+      // 2. Telemetría Real y Evaluación Económica Rigurosa (0% Ondas Sinusoidales - 100% Flash Loan)
+      const evaluation = EconomicMath.evaluateOpportunity({
+        chainId,
+        loanTokenAddress: tokenIn,
+        loanAmount: profitableFlash || flashAmounts[0],
+        simulatedGrossProfitUnits: simulatedProfit,
+        tokenPriceUSD: priceUSD,
+        ethPriceUSD: ethPrice,
+        calldataSizeBytes: 384,
+        slippageBufferBps: 15,
+      });
 
-      if (isProfitable && simulatedProfit > 0n) {
-        const amt = profitableSpot || profitableFlash!;
-        const amtNum = parseFloat(ethers.formatUnits(amt, decimalsIn));
-        const profitNum = parseFloat(ethers.formatUnits(simulatedProfit, decimalsIn));
-        const priceUSD = decimalsIn === 6 ? 1.0 : (cexLagPredictor.getCEXPrice('ETH') || 2500.0);
-
-        loanUSD = amtNum * priceUSD;
-        grossUSD = parseFloat((profitNum * priceUSD).toFixed(2));
-        formattedSpread = loanUSD > 0 ? parseFloat(((grossUSD / loanUSD) * 100).toFixed(3)) : 0;
-      }
-
-      const netUSD = isProfitable ? Math.max(0, parseFloat((grossUSD - 0.05).toFixed(2))) : 0;
+      const formattedSpread = evaluation.loanAmountUSD > 0
+        ? parseFloat(((evaluation.grossProfitUSD / evaluation.loanAmountUSD) * 100).toFixed(3))
+        : 0;
 
       const dexBuyName = isBase ? (buyDex === 0 ? 'UniV3' : (buyDex === 1 ? 'AeroSlip' : (buyDex === 2 ? 'AeroVol' : (buyDex === 3 ? 'AeroStable' : 'PancakeV3')))) : 'UniV3';
       const dexSellName = isBase ? (sellDex === 0 ? 'UniV3' : (sellDex === 1 ? 'AeroSlip' : (sellDex === 2 ? 'AeroVol' : (sellDex === 3 ? 'AeroStable' : 'PancakeV3')))) : 'UniV3';
@@ -305,104 +297,49 @@ export class LowFeeExecutor {
         type: 'LOW_FEE',
         feeTier,
         tokenBorrow: tokenIn,
-        tokenBorrowSymbol: decimalsIn === 6 ? 'USDC' : 'WETH',
-        loanAmount: profitableSpot ? `$35 USD` : (profitableFlash ? `$${loanUSD.toLocaleString()} USD` : '$25,000 USD'),
+        tokenBorrowSymbol: evaluation.loanTokenSymbol,
+        loanAmount: profitableFlash ? `$${evaluation.loanAmountUSD.toLocaleString()} USD` : '$25,000 USD',
         protocolA: dexBuyName,
         protocolB: dexSellName,
         spreadPercent: formattedSpread,
-        grossProfitUSD: grossUSD,
-        netProfitUSD: netUSD,
+        grossProfitUSD: evaluation.grossProfitUSD,
+        netProfitUSD: evaluation.netProfitUSD,
         timestamp: Date.now(),
-        isProfitable,
+        isProfitable: evaluation.isProfitable,
         contractAddress: isBase ? CONTRACT_BASE : CONTRACT_ARBITRUM
       });
 
-      // 4. Disparo On-Chain con Pre-Flight EstimateGas
-      if (profitableFlash && netUSD > 0.20) {
+      // 3. Disparo Centralizado con Mutex, Pre-Flight y Gas Guard (Exclusivamente Flash Loan)
+      if (profitableFlash && evaluation.isProfitable) {
         this.isExecuting = true;
-        const providerName = isBalancer ? 'Balancer V2 (0% Fee)' : 'Aave V3';
-
-        let gasEstimated: bigint;
         try {
-          gasEstimated = isBalancer
-            ? await contract.executeBalancerFlashLoanSpatial.estimateGas(routeStruct, profitableFlash)
-            : await contract.executeFlashLoanSpatial.estimateGas(routeStruct, profitableFlash);
-        } catch (estErr: any) {
-          logger.warn(`⚠️ [PRE-FLIGHT LOW-FEE ABORT] ${estErr.message}`);
+          const result = await transactionDispatcher.dispatchSpatial({
+            chainId,
+            pairName: `[${feeTier}] ${pairName}`,
+            provider: isBalancer ? 'balancer' : 'aave',
+            contract,
+            routeStruct,
+            loanAmount: profitableFlash,
+            evaluation,
+          });
+
+          if (result.success) {
+            this.consecutiveErrors = 0;
+            if (!result.simulated) {
+              SERVER_STATS.lowFee.executedCount++;
+              SERVER_STATS.lowFee.realizedPnLUSD += result.realizedNetProfitUSD ?? evaluation.netProfitUSD;
+              savePersistedStats();
+              return true;
+            } else {
+              SERVER_STATS.lowFee.simulatedCount++;
+              SERVER_STATS.lowFee.simulatedPnLUSD += evaluation.netProfitUSD;
+              savePersistedStats();
+            }
+          } else if (result.reason) {
+            this.handleRevert(result.reason);
+          }
+        } finally {
           this.isExecuting = false;
-          return false;
-        }
-
-        const gasLimit = (gasEstimated * 115n) / 100n;
-        logger.success(`🔥 [LOW-FEE FLASH DISPARADO] ${pairName} vía ${providerName}!`);
-
-        if (ENV.dryRun) {
-          logger.info(`🧪 [DRY RUN VALIDADO LOW-FEE] Flash Loan ${providerName} en ${pairName} | Spread: ${formattedSpread}% | Net: +$${netUSD} USD. Omitiendo tx real.`);
-          addScanLog(`🧪 [DRY RUN LOW-FEE] Oportunidad validada en ${pairName} (Net: +$${netUSD} USD).`, 'LOW_FEE');
-          this.consecutiveErrors = 0;
-          SERVER_STATS.lowFee.executedCount++;
-          SERVER_STATS.lowFee.realizedPnLUSD += netUSD;
-          savePersistedStats();
-          this.isExecuting = false;
-          return true;
-        }
-
-        addScanLog(`🚀 [DISPARO LOW-FEE ${isBase ? 'BASE' : 'ARBITRUM'}] ${pairName}...`, 'LOW_FEE');
-
-        const tx = isBalancer
-          ? await contract.executeBalancerFlashLoanSpatial(routeStruct, profitableFlash, { gasLimit })
-          : await contract.executeFlashLoanSpatial(routeStruct, profitableFlash, { gasLimit });
-
-        const receipt = await tx.wait(1);
-        if (receipt && receipt.status === 1) {
-          logger.success(`🎉 [LOW-FEE CONFIRMADO] Bloque #${receipt.blockNumber}!`);
-          this.consecutiveErrors = 0;
-          SERVER_STATS.lowFee.executedCount++;
-          SERVER_STATS.lowFee.realizedPnLUSD += netUSD;
-          savePersistedStats();
-          this.isExecuting = false;
-          return true;
-        } else {
-          this.handleRevert('Low-Fee Flash Reverted');
-        }
-      } else if (profitableSpot && netUSD > 0.05) {
-        this.isExecuting = true;
-
-        let gasEstimated: bigint;
-        try {
-          gasEstimated = await contract.executeSpotSpatial.estimateGas(routeStruct, profitableSpot);
-        } catch (estErr: any) {
-          logger.warn(`⚠️ [PRE-FLIGHT LOW-FEE SPOT ABORT] ${estErr.message}`);
-          this.isExecuting = false;
-          return false;
-        }
-
-        const gasLimit = (gasEstimated * 115n) / 100n;
-
-        if (ENV.dryRun) {
-          logger.info(`🧪 [DRY RUN VALIDADO LOW-FEE SPOT] Spot en ${pairName} | Spread: ${formattedSpread}% | Net: +$${netUSD} USD. Omitiendo tx real.`);
-          addScanLog(`🧪 [DRY RUN LOW-FEE SPOT] Spot validado en ${pairName} (Net: +$${netUSD} USD).`, 'LOW_FEE');
-          this.consecutiveErrors = 0;
-          SERVER_STATS.lowFee.executedCount++;
-          SERVER_STATS.lowFee.realizedPnLUSD += netUSD;
-          savePersistedStats();
-          this.isExecuting = false;
-          return true;
-        }
-
-        const tx = await contract.executeSpotSpatial(routeStruct, profitableSpot, { gasLimit });
-        const receipt = await tx.wait(1);
-
-        if (receipt && receipt.status === 1) {
-          logger.success(`🎉 [LOW-FEE SPOT CONFIRMADO] Bloque #${receipt.blockNumber}!`);
-          this.consecutiveErrors = 0;
-          SERVER_STATS.lowFee.executedCount++;
-          SERVER_STATS.lowFee.realizedPnLUSD += netUSD;
-          savePersistedStats();
-          this.isExecuting = false;
-          return true;
-        } else {
-          this.handleRevert('Low-Fee Spot Reverted');
         }
       } else {
         addScanLog(`🔍 [${feeTier}] ${pairName} | Saldo Protegido (0 riesgo)`, 'LOW_FEE');
@@ -454,22 +391,26 @@ export class LowFeeExecutor {
           ).catch(() => false)
         );
 
-        const pairArb = LOW_FEE_PAIRS_ARB[Math.floor(Math.random() * LOW_FEE_PAIRS_ARB.length)];
-        const routeArb = pairArb.routes[Math.floor(Math.random() * pairArb.routes.length)];
-        tasks.push(
-          this.scanLowFeePair(
-            42161,
-            pairArb.name,
-            pairArb.feeTier,
-            pairArb.tokenIn,
-            pairArb.tokenOut,
-            routeArb.buyDex,
-            routeArb.sellDex,
-            routeArb.feeBuy,
-            routeArb.feeSell,
-            pairArb.decimalsIn
-          ).catch(() => false)
-        );
+        if (ENV.enableArbitrum) {
+          const pairArb = LOW_FEE_PAIRS_ARB[Math.floor(Math.random() * LOW_FEE_PAIRS_ARB.length)];
+          const routeArb = pairArb.routes[Math.floor(Math.random() * pairArb.routes.length)];
+          if (routeArb) {
+            tasks.push(
+              this.scanLowFeePair(
+                42161,
+                pairArb.name,
+                pairArb.feeTier,
+                pairArb.tokenIn,
+                pairArb.tokenOut,
+                routeArb.buyDex,
+                routeArb.sellDex,
+                routeArb.feeBuy,
+                routeArb.feeSell,
+                pairArb.decimalsIn
+              ).catch(() => false)
+            );
+          }
+        }
 
         await Promise.allSettled(tasks);
       } catch (err: any) {

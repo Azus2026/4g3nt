@@ -18,6 +18,21 @@ interface IUniswapV3Router {
     function exactInputSingle(ExactInputSingleParams calldata params) external payable returns (uint256 amountOut);
 }
 
+// Interfaz estándar de 8 parámetros (selector 0x414bf389) para PancakeSwap V3 y SushiSwap V3
+interface IPancakeV3Router {
+    struct ExactInputSingleParams {
+        address tokenIn;
+        address tokenOut;
+        uint24 fee;
+        address recipient;
+        uint256 deadline;
+        uint256 amountIn;
+        uint256 amountOutMinimum;
+        uint160 sqrtPriceLimitX96;
+    }
+    function exactInputSingle(ExactInputSingleParams calldata params) external payable returns (uint256 amountOut);
+}
+
 interface ICamelotV3Router {
     struct ExactInputSingleParams {
         address tokenIn;
@@ -89,20 +104,21 @@ contract ArbitrumUniversalArbitrage is IFlashLoanSimpleReceiver, IFlashLoanRecip
     address public constant AAVE_POOL = 0x794a61358D6845594F94dc1DB02A252b5b4814aD;
     address public constant BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
 
-    // DEX Routers en Arbitrum
+    // DEX Routers en Arbitrum One
     address public constant UNIV3_ROUTER = 0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45;
     address public constant CAMELOT_V3_ROUTER = 0x1F721E2E82F6676FCE4eA07A5958cF098D339e18;
     address public constant CAMELOT_V2_ROUTER = 0xc873fEcbd354f5A56E00E710B90EF4201db2448d;
     address public constant PANCAKE_V3_ROUTER = 0x1b81D678ffb9C0263b24A97847620C99d213eB14;
-    address public constant SUSHISWAP_V3_ROUTER = 0xFB7eF66a7e61224DD6FcD0D7d9C3be5C8B049b9f;
+    // Dirección oficial de SushiSwap V3 Router en Arbitrum One
+    address public constant SUSHISWAP_V3_ROUTER = 0x8A21F6768C1f8075791D08546Dadf6daA0bE820c;
 
     // Enum de DEXes en Arbitrum
     enum DexType {
         UNIV3,          // 0: Uniswap V3 (Concentrated Liquidity)
         CAMELOT_V3,     // 1: Camelot V3 / Algebra (CL)
         CAMELOT_V2,     // 2: Camelot Classic AMM V2
-        PANCAKE_V3,     // 3: PancakeSwap V3 (CL)
-        SUSHISWAP_V3    // 4: SushiSwap V3 (CL)
+        PANCAKE_V3,     // 3: PancakeSwap V3 (CL - 8 params)
+        SUSHISWAP_V3    // 4: SushiSwap V3 (CL - 8 params)
     }
 
     struct SpatialRoute {
@@ -134,9 +150,7 @@ contract ArbitrumUniversalArbitrage is IFlashLoanSimpleReceiver, IFlashLoanRecip
     uint256 private _lastProfit;
     bool private _inFlashLoan;
 
-    event SpatialExecuted(address indexed token, uint256 amountIn, uint256 amountOut, uint256 profit);
-    event TriangularExecuted(address indexed token, uint256 amountIn, uint256 amountOut, uint256 profit);
-    event FlashLoanExecuted(address indexed asset, uint256 loanAmount, uint256 premium, uint256 netProfit);
+    event FlashLoanExecuted(address indexed token, uint256 loanAmount, uint256 grossProfit, uint256 timestamp);
 
     error OnlyOwner();
     error NotAavePool();
@@ -151,7 +165,6 @@ contract ArbitrumUniversalArbitrage is IFlashLoanSimpleReceiver, IFlashLoanRecip
 
     constructor() {
         owner = msg.sender;
-        _approveTokenToRouters(WETH);
     }
 
     receive() external payable {}
@@ -189,7 +202,7 @@ contract ArbitrumUniversalArbitrage is IFlashLoanSimpleReceiver, IFlashLoanRecip
             IERC20(tokenIn).forceApprove(router, type(uint256).max);
         }
 
-        if (dexId == uint8(DexType.UNIV3) || dexId == uint8(DexType.PANCAKE_V3) || dexId == uint8(DexType.SUSHISWAP_V3)) {
+        if (dexId == uint8(DexType.UNIV3)) {
             IUniswapV3Router.ExactInputSingleParams memory params = IUniswapV3Router.ExactInputSingleParams({
                 tokenIn: tokenIn,
                 tokenOut: tokenOut,
@@ -200,12 +213,25 @@ contract ArbitrumUniversalArbitrage is IFlashLoanSimpleReceiver, IFlashLoanRecip
                 sqrtPriceLimitX96: 0
             });
             return IUniswapV3Router(router).exactInputSingle(params);
+        } else if (dexId == uint8(DexType.PANCAKE_V3) || dexId == uint8(DexType.SUSHISWAP_V3)) {
+            // Variante de 8 parámetros con deadline para PancakeSwap V3 y SushiSwap V3 (selector 0x414bf389)
+            IPancakeV3Router.ExactInputSingleParams memory params = IPancakeV3Router.ExactInputSingleParams({
+                tokenIn: tokenIn,
+                tokenOut: tokenOut,
+                fee: feeOrSpacing,
+                recipient: address(this),
+                deadline: block.timestamp + 120,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            });
+            return IPancakeV3Router(router).exactInputSingle(params);
         } else if (dexId == uint8(DexType.CAMELOT_V3)) {
             ICamelotV3Router.ExactInputSingleParams memory params = ICamelotV3Router.ExactInputSingleParams({
                 tokenIn: tokenIn,
                 tokenOut: tokenOut,
                 recipient: address(this),
-                deadline: block.timestamp,
+                deadline: block.timestamp + 120,
                 amountIn: amountIn,
                 amountOutMinimum: 0,
                 limitSqrtPrice: 0
@@ -220,56 +246,16 @@ contract ArbitrumUniversalArbitrage is IFlashLoanSimpleReceiver, IFlashLoanRecip
                 0,
                 path,
                 address(this),
-                block.timestamp
+                block.timestamp + 120
             );
             return amounts[amounts.length - 1];
         }
         revert InvalidDEX(dexId);
     }
 
-    function executeSpotSpatial(SpatialRoute calldata route, uint256 amountIn) external onlyOwner returns (uint256 profit) {
-        IERC20(route.tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
-        uint256 initialBalance = IERC20(route.tokenIn).balanceOf(address(this));
-
-        uint256 interAmount = _swap(route.tokenIn, route.tokenIntermediate, amountIn, route.dexBuy, route.feeOrSpacingBuy);
-        uint256 finalOut = _swap(route.tokenIntermediate, route.tokenIn, interAmount, route.dexSell, route.feeOrSpacingSell);
-
-        uint256 finalBalance = IERC20(route.tokenIn).balanceOf(address(this));
-        uint256 requiredAmount = initialBalance + route.minProfit;
-
-        if (finalBalance < requiredAmount) {
-            revert NotProfitable(finalBalance, requiredAmount);
-        }
-
-        profit = finalBalance - initialBalance;
-        IERC20(route.tokenIn).safeTransfer(msg.sender, amountIn + profit);
-
-        emit SpatialExecuted(route.tokenIn, amountIn, finalOut, profit);
-        return profit;
-    }
-
-    function executeSpotTriangular(TriangularRoute calldata route, uint256 amountIn) external onlyOwner returns (uint256 profit) {
-        IERC20(route.tokenA).safeTransferFrom(msg.sender, address(this), amountIn);
-        uint256 initialBalance = IERC20(route.tokenA).balanceOf(address(this));
-
-        uint256 amountB = _swap(route.tokenA, route.tokenB, amountIn, route.dex1, route.feeOrSpacing1);
-        uint256 amountC = _swap(route.tokenB, route.tokenC, amountB, route.dex2, route.feeOrSpacing2);
-        uint256 finalOut = _swap(route.tokenC, route.tokenA, amountC, route.dex3, route.feeOrSpacing3);
-
-        uint256 finalBalance = IERC20(route.tokenA).balanceOf(address(this));
-        uint256 requiredAmount = initialBalance + route.minProfit;
-
-        if (finalBalance < requiredAmount) {
-            revert NotProfitable(finalBalance, requiredAmount);
-        }
-
-        profit = finalBalance - initialBalance;
-        IERC20(route.tokenA).safeTransfer(msg.sender, amountIn + profit);
-
-        emit TriangularExecuted(route.tokenA, amountIn, finalOut, profit);
-        return profit;
-    }
-
+    // ═══════════════════════════════════════════════════════════
+    //  1. Flash Loans con Aave V3 (Arbitrum)
+    // ═══════════════════════════════════════════════════════════
     function executeFlashLoanSpatial(SpatialRoute calldata route, uint256 loanAmount) external onlyOwner returns (uint256 profit) {
         _inFlashLoan = true;
         _lastProfit = 0;
@@ -288,6 +274,9 @@ contract ArbitrumUniversalArbitrage is IFlashLoanSimpleReceiver, IFlashLoanRecip
         return _lastProfit;
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  2. Flash Loans con Balancer V2 (Arbitrum - 0% Fee)
+    // ═══════════════════════════════════════════════════════════
     function executeBalancerFlashLoanSpatial(SpatialRoute calldata route, uint256 loanAmount) external onlyOwner returns (uint256 profit) {
         _inFlashLoan = true;
         _lastProfit = 0;
@@ -314,6 +303,9 @@ contract ArbitrumUniversalArbitrage is IFlashLoanSimpleReceiver, IFlashLoanRecip
         return _lastProfit;
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  3. Callback Aave V3 con AISLAMIENTO DE SALDO PREVIO
+    // ═══════════════════════════════════════════════════════════
     function executeOperation(
         address asset,
         uint256 amount,
@@ -325,49 +317,51 @@ contract ArbitrumUniversalArbitrage is IFlashLoanSimpleReceiver, IFlashLoanRecip
         require(initiator == address(this), "Initiator not this contract");
         require(_inFlashLoan, "Unauthorized flash loan initiation");
 
+        uint256 totalOwed = amount + premium;
+
+        // AISLAMIENTO DE CAPITAL: Capturar saldo previo a la llegada del préstamo
+        uint256 currentBalAtEntry = IERC20(asset).balanceOf(address(this));
+        uint256 preExistingBalance = currentBalAtEntry > amount ? currentBalAtEntry - amount : 0;
+
         (uint8 routeType, bytes memory routeData) = abi.decode(params, (uint8, bytes));
-        uint256 amountOwed = amount + premium;
+        uint256 minProfit;
 
         if (routeType == 0) {
             SpatialRoute memory route = abi.decode(routeData, (SpatialRoute));
+            minProfit = route.minProfit;
             uint256 interAmount = _swap(route.tokenIn, route.tokenIntermediate, amount, route.dexBuy, route.feeOrSpacingBuy);
             _swap(route.tokenIntermediate, route.tokenIn, interAmount, route.dexSell, route.feeOrSpacingSell);
-
-            uint256 currentBalance = IERC20(asset).balanceOf(address(this));
-            if (currentBalance < amountOwed + route.minProfit) {
-                revert NotProfitable(currentBalance, amountOwed + route.minProfit);
-            }
-
-            IERC20(asset).safeIncreaseAllowance(AAVE_POOL, amountOwed);
-            uint256 netProfit = currentBalance - amountOwed;
-            _lastProfit = netProfit;
-            if (netProfit > 0) {
-                IERC20(asset).safeTransfer(owner, netProfit);
-            }
-            emit FlashLoanExecuted(asset, amount, premium, netProfit);
         } else if (routeType == 1) {
             TriangularRoute memory route = abi.decode(routeData, (TriangularRoute));
+            minProfit = route.minProfit;
             uint256 amountB = _swap(route.tokenA, route.tokenB, amount, route.dex1, route.feeOrSpacing1);
             uint256 amountC = _swap(route.tokenB, route.tokenC, amountB, route.dex2, route.feeOrSpacing2);
             _swap(route.tokenC, route.tokenA, amountC, route.dex3, route.feeOrSpacing3);
-
-            uint256 currentBalance = IERC20(asset).balanceOf(address(this));
-            if (currentBalance < amountOwed + route.minProfit) {
-                revert NotProfitable(currentBalance, amountOwed + route.minProfit);
-            }
-
-            IERC20(asset).safeIncreaseAllowance(AAVE_POOL, amountOwed);
-            uint256 netProfit = currentBalance - amountOwed;
-            _lastProfit = netProfit;
-            if (netProfit > 0) {
-                IERC20(asset).safeTransfer(owner, netProfit);
-            }
-            emit FlashLoanExecuted(asset, amount, premium, netProfit);
         }
 
+        uint256 currentBalance = IERC20(asset).balanceOf(address(this));
+        uint256 requiredBalance = preExistingBalance + totalOwed + minProfit;
+
+        // Prohibido subsidiar operaciones perdedoras con saldo previo
+        if (currentBalance < requiredBalance) {
+            revert NotProfitable(currentBalance, requiredBalance);
+        }
+
+        IERC20(asset).forceApprove(AAVE_POOL, totalOwed);
+        uint256 netProfit = currentBalance - totalOwed - preExistingBalance;
+        _lastProfit = netProfit;
+
+        if (netProfit > 0) {
+            IERC20(asset).safeTransfer(owner, netProfit);
+        }
+
+        emit FlashLoanExecuted(asset, amount, netProfit, block.timestamp);
         return true;
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  4. Callback Balancer V2 con AISLAMIENTO DE SALDO PREVIO
+    // ═══════════════════════════════════════════════════════════
     function receiveFlashLoan(
         IERC20[] memory tokens,
         uint256[] memory amounts,
@@ -377,47 +371,47 @@ contract ArbitrumUniversalArbitrage is IFlashLoanSimpleReceiver, IFlashLoanRecip
         if (msg.sender != BALANCER_VAULT) revert NotBalancerVault();
         require(_inFlashLoan, "Unauthorized flash loan initiation");
 
-        (uint8 routeType, bytes memory routeData) = abi.decode(userData, (uint8, bytes));
         address asset = address(tokens[0]);
         uint256 amount = amounts[0];
         uint256 amountOwed = amount + feeAmounts[0]; // Balancer fee is 0%
 
+        // AISLAMIENTO DE CAPITAL: Capturar saldo previo a la llegada del préstamo
+        uint256 currentBalAtEntry = IERC20(asset).balanceOf(address(this));
+        uint256 preExistingBalance = currentBalAtEntry > amount ? currentBalAtEntry - amount : 0;
+
+        (uint8 routeType, bytes memory routeData) = abi.decode(userData, (uint8, bytes));
+        uint256 minProfit;
+
         if (routeType == 0) {
             SpatialRoute memory route = abi.decode(routeData, (SpatialRoute));
+            minProfit = route.minProfit;
             uint256 interAmount = _swap(route.tokenIn, route.tokenIntermediate, amount, route.dexBuy, route.feeOrSpacingBuy);
             _swap(route.tokenIntermediate, route.tokenIn, interAmount, route.dexSell, route.feeOrSpacingSell);
-
-            uint256 currentBalance = IERC20(asset).balanceOf(address(this));
-            if (currentBalance < amountOwed + route.minProfit) {
-                revert NotProfitable(currentBalance, amountOwed + route.minProfit);
-            }
-
-            IERC20(asset).safeTransfer(BALANCER_VAULT, amountOwed);
-            uint256 netProfit = currentBalance - amountOwed;
-            _lastProfit = netProfit;
-            if (netProfit > 0) {
-                IERC20(asset).safeTransfer(owner, netProfit);
-            }
-            emit FlashLoanExecuted(asset, amount, feeAmounts[0], netProfit);
         } else if (routeType == 1) {
             TriangularRoute memory route = abi.decode(routeData, (TriangularRoute));
+            minProfit = route.minProfit;
             uint256 amountB = _swap(route.tokenA, route.tokenB, amount, route.dex1, route.feeOrSpacing1);
             uint256 amountC = _swap(route.tokenB, route.tokenC, amountB, route.dex2, route.feeOrSpacing2);
             _swap(route.tokenC, route.tokenA, amountC, route.dex3, route.feeOrSpacing3);
-
-            uint256 currentBalance = IERC20(asset).balanceOf(address(this));
-            if (currentBalance < amountOwed + route.minProfit) {
-                revert NotProfitable(currentBalance, amountOwed + route.minProfit);
-            }
-
-            IERC20(asset).safeTransfer(BALANCER_VAULT, amountOwed);
-            uint256 netProfit = currentBalance - amountOwed;
-            _lastProfit = netProfit;
-            if (netProfit > 0) {
-                IERC20(asset).safeTransfer(owner, netProfit);
-            }
-            emit FlashLoanExecuted(asset, amount, feeAmounts[0], netProfit);
         }
+
+        uint256 currentBalance = IERC20(asset).balanceOf(address(this));
+        uint256 requiredBalance = preExistingBalance + amountOwed + minProfit;
+
+        // Prohibido subsidiar operaciones perdedoras con saldo previo
+        if (currentBalance < requiredBalance) {
+            revert NotProfitable(currentBalance, requiredBalance);
+        }
+
+        IERC20(asset).safeTransfer(BALANCER_VAULT, amountOwed);
+        uint256 netProfit = currentBalance - amountOwed - preExistingBalance;
+        _lastProfit = netProfit;
+
+        if (netProfit > 0) {
+            IERC20(asset).safeTransfer(owner, netProfit);
+        }
+
+        emit FlashLoanExecuted(asset, amount, netProfit, block.timestamp);
     }
 
     function withdrawToken(address token) external onlyOwner {

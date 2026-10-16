@@ -23,11 +23,17 @@ export class SwarmManager {
   private initWorkers() {
     logger.info(`🤖 Inicializando Swarm de Agentes Autónomos...`);
 
-    const pairsCount = MULTI_CHAIN_ARBITRAGE_PAIRS.length;
+    const activePairs = MULTI_CHAIN_ARBITRAGE_PAIRS.filter(p => {
+      if (p.chainId === 8453) return true;
+      if (p.chainId === 42161 && ENV.enableArbitrum) return true;
+      return false;
+    });
+    const pairsPool = activePairs.length > 0 ? activePairs : MULTI_CHAIN_ARBITRAGE_PAIRS;
+    const pairsCount = pairsPool.length;
     const activeDefs = SWARM_AGENTS.slice(0, Math.min(SWARM_AGENTS.length, 100));
     for (const def of activeDefs) {
       const assignedPairIndex = (def.id - 1) % pairsCount;
-      const assignedPairs = [MULTI_CHAIN_ARBITRAGE_PAIRS[assignedPairIndex]];
+      const assignedPairs = [pairsPool[assignedPairIndex]];
 
       const worker = new AgentWorker(def, assignedPairs, this.rpcManager, this.executor);
       this.workers.set(def.id, worker);

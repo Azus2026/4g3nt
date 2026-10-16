@@ -253,6 +253,66 @@
 
   <div class="container">
 
+    <!-- 📊 BARRA DE TELEMETRÍA EN VIVO: SALDOS, BILLETERA, CONTRATOS Y ÓRDENES EJECUTADAS -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; background: rgba(17, 24, 39, 0.9); border: 1px solid rgba(0, 242, 254, 0.3); border-radius: 16px; padding: 1.1rem 1.25rem; box-shadow: 0 8px 30px rgba(0,0,0,0.4);">
+      
+      <!-- KPI 1: Billetera & Contratos On-Chain -->
+      <div style="border-right: 1px solid rgba(255,255,255,0.07); padding-right: 0.75rem;">
+        <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.3rem;">
+          🔐 Billetera & Contratos Auditados
+        </div>
+        <div style="font-size: 0.92rem; font-weight: 700; color: #34d399; font-family: monospace;" id="kpiWalletAddr">
+          0xf6Bb92...419AC87
+        </div>
+        <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem; display: flex; gap: 0.6rem; flex-wrap: wrap;">
+          <a id="linkBaseWallet" href="https://basescan.org/address/0xf6Bb92Ac612D814F2A1e67Bf713F2f732419AC87" target="_blank" style="color: var(--accent-cyan); text-decoration: none;">↗ BaseScan</a>
+          <a id="linkArbWallet" href="https://arbiscan.io/address/0xf6Bb92Ac612D814F2A1e67Bf713F2f732419AC87" target="_blank" style="color: #c084fc; text-decoration: none;">↗ Arbiscan</a>
+          <span>Contrato: <code style="color: #facc15;" id="kpiContractAddr">0xD4A2...4018</code></span>
+        </div>
+      </div>
+
+      <!-- KPI 2: Saldos Reales en Billetera (Base + Arbitrum) -->
+      <div style="border-right: 1px solid rgba(255,255,255,0.07); padding-right: 0.75rem;">
+        <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.3rem;">
+          💰 Tu Saldo Real en Vivo (On-Chain)
+        </div>
+        <div style="font-size: 1.2rem; font-weight: 800; color: var(--accent-green);" id="kpiTotalBalanceUsd">
+          ~$49.10 USD
+        </div>
+        <div style="font-size: 0.74rem; color: #e2e8f0; margin-top: 0.2rem;">
+          Base: <strong style="color: #34d399;" id="kpiBaseEth">0.00988 ETH</strong> • Arb: <strong style="color: #38bdf8;" id="kpiArbEth">0.00976 ETH</strong>
+        </div>
+      </div>
+
+      <!-- KPI 3: Contador de Órdenes Ejecutadas / Disparadas -->
+      <div style="border-right: 1px solid rgba(255,255,255,0.07); padding-right: 0.75rem;">
+        <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.3rem;">
+          ⚡ Órdenes Ejecutadas / Disparadas
+        </div>
+        <div style="display: flex; align-items: baseline; gap: 0.5rem;">
+          <span style="font-size: 1.35rem; font-weight: 800; color: var(--accent-cyan);" id="kpiTotalOrders">0</span>
+          <span style="font-size: 0.72rem; color: var(--text-muted);" id="kpiScansTotal">(0 escaneos RPC)</span>
+        </div>
+        <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;" id="kpiOrdersBreakdown">
+          Low-Fee: 0 | Spot: 0 | FlashLoan: 0
+        </div>
+      </div>
+
+      <!-- KPI 4: Ganancia Neta (PnL) -->
+      <div>
+        <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.3rem;">
+          📈 Ganancia Neta Acumulada (PnL)
+        </div>
+        <div style="font-size: 1.35rem; font-weight: 800; color: var(--accent-yellow);" id="kpiTotalPnl">
+          +$0.0000 USD
+        </div>
+        <div style="font-size: 0.72rem; color: #34d399; margin-top: 0.2rem;">
+          ● Verificación <code style="color:#fff;">staticCall</code> + <code style="color:#fff;">estimateGas</code> activa
+        </div>
+      </div>
+
+    </div>
+
     <!-- View Mode Filter Selector -->
     <div style="display: flex; justify-content: space-between; align-items: center;">
       <div class="filter-tabs">
@@ -313,7 +373,7 @@
           <div class="metric-box">
             <div class="metric-label">Modo Operativo</div>
             <div class="metric-value" style="color: var(--accent-cyan); font-size: 1.1rem;">Dual (Spot + Flash)</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted);">Balancer 0% + $35 Saldo</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">Balancer 0% + Saldo Wallet</div>
           </div>
         </div>
 
@@ -331,16 +391,16 @@
         </div>
       </div>
 
-      <!-- 🟢 PANEL 2: Saldo Real $35 en Base -->
+      <!-- 🟢 PANEL 2: Saldo Real en Base & Arbitrum -->
       <div class="command-panel panel-spot" id="panelSpot">
         <div class="panel-header">
           <div>
             <div class="panel-title" style="color: var(--accent-green);">
               <i data-lucide="wallet"></i>
-              ESTRATEGIA 2: SALDO REAL EN BASE ($35 USD)
+              ESTRATEGIA 2: SALDO REAL EN WALLET (BASE + ARB)
             </div>
             <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">
-              Wallet Base: <code style="color: #34d399;">0x00Ae...08aA</code> • Gas: <span id="valGasEth">0.00099 ETH</span>
+              Wallet: <code style="color: #34d399;" id="valWalletCode">0xf6Bb...AC87</code> • Base: <span id="valGasEth">0.00988 ETH</span> • Arb: <span id="valGasArbEth">0.00976 ETH</span>
             </div>
           </div>
           <div class="pair-type-pill type-spot">
@@ -350,9 +410,9 @@
 
         <div class="panel-metrics-grid">
           <div class="metric-box">
-            <div class="metric-label">Capital en Wallet</div>
-            <div class="metric-value" style="color: var(--accent-green); font-size: 1.1rem;" id="valSpotWeth">0.0145 WETH</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted);">~$35.88 USD (Base L2)</div>
+            <div class="metric-label">Saldo Total Gas</div>
+            <div class="metric-value" style="color: var(--accent-green); font-size: 1.1rem;" id="valSpotWeth">0.0196 ETH</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);" id="valSpotUsd">~$49.10 USD (Base + Arb)</div>
           </div>
           <div class="metric-box">
             <div class="metric-label">Umbral de Disparo</div>
@@ -510,6 +570,55 @@
         const stats = data.stats;
 
         document.getElementById('lblLastUpdate').innerText = new Date().toLocaleTimeString();
+
+        // 0. Actualizar Barra Superior de Saldos Reales, Billetera y Órdenes Ejecutadas
+        if (stats && stats.spotBase) {
+          const w = stats.spotBase.wallet || '0xf6Bb92Ac612D814F2A1e67Bf713F2f732419AC87';
+          const shortW = `${w.slice(0, 6)}...${w.slice(-4)}`;
+          const baseEth = Number(stats.spotBase.nativeGasETH ?? 0.009876);
+          const arbEth = Number(stats.spotBase.nativeGasArbETH ?? 0.009761);
+          const totalEth = baseEth + arbEth;
+          const totalUsd = Number(stats.spotBase.balanceUSD ?? (totalEth * 2500));
+
+          const elKpiWallet = document.getElementById('kpiWalletAddr');
+          if (elKpiWallet) elKpiWallet.innerText = `${w.slice(0, 8)}...${w.slice(-6)}`;
+          const elWalletCode = document.getElementById('valWalletCode');
+          if (elWalletCode) elWalletCode.innerText = shortW;
+
+          const elBaseEth = document.getElementById('kpiBaseEth');
+          if (elBaseEth) elBaseEth.innerText = `${baseEth.toFixed(5)} ETH`;
+          const elArbEth = document.getElementById('kpiArbEth');
+          if (elArbEth) elArbEth.innerText = `${arbEth.toFixed(5)} ETH`;
+          const elTotalUsd = document.getElementById('kpiTotalBalanceUsd');
+          if (elTotalUsd) elTotalUsd.innerText = `~$${totalUsd.toFixed(2)} USD`;
+
+          const elValGasEth = document.getElementById('valGasEth');
+          if (elValGasEth) elValGasEth.innerText = `${baseEth.toFixed(5)} ETH`;
+          const elValGasArb = document.getElementById('valGasArbEth');
+          if (elValGasArb) elValGasArb.innerText = `${arbEth.toFixed(5)} ETH`;
+          const elValSpotWeth = document.getElementById('valSpotWeth');
+          if (elValSpotWeth) elValSpotWeth.innerText = `${totalEth.toFixed(4)} ETH`;
+          const elValSpotUsd = document.getElementById('valSpotUsd');
+          if (elValSpotUsd) elValSpotUsd.innerText = `~$${totalUsd.toFixed(2)} USD (Base + Arb)`;
+
+          const lowFeeOrders = Number((stats.lowFee && stats.lowFee.executedCount) || 0);
+          const spotOrders = Number(stats.spotBase.executedCount || 0);
+          const flashOrders = Number((stats.flashLoans && stats.flashLoans.onChainExecutedCount) || 0);
+          const totalOrders = lowFeeOrders + spotOrders + flashOrders;
+
+          const elTotalOrders = document.getElementById('kpiTotalOrders');
+          if (elTotalOrders) elTotalOrders.innerText = String(totalOrders);
+          const elScansTotal = document.getElementById('kpiScansTotal');
+          if (elScansTotal) elScansTotal.innerText = `(${Number(stats.scansCompleted || 0).toLocaleString()} escaneos RPC)`;
+          const elBreakdown = document.getElementById('kpiOrdersBreakdown');
+          if (elBreakdown) elBreakdown.innerText = `Low-Fee: ${lowFeeOrders} | Spot: ${spotOrders} | FlashLoan: ${flashOrders}`;
+
+          const totalPnl = Number((stats.lowFee && stats.lowFee.realizedPnLUSD) || 0)
+            + Number(stats.spotBase.realizedPnLUSD || 0)
+            + Number((stats.flashLoans && stats.flashLoans.detectedPnLUSD) || 0);
+          const elTotalPnl = document.getElementById('kpiTotalPnl');
+          if (elTotalPnl) elTotalPnl.innerText = `+$${totalPnl.toFixed(4)} USD`;
+        }
 
         // 1. Actualizar Consola de Low-Fee (0.01% y 0.05%)
         if (data.lowFeeLogs && data.lowFeeLogs.length > 0) {

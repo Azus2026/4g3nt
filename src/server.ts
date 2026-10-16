@@ -77,10 +77,13 @@ export const SERVER_STATS = {
   spotBase: {
     wallet: '0xf6Bb92Ac612D814F2A1e67Bf713F2f732419AC87',
     balanceWETH: '0.000000',
-    balanceUSD: 25.00,
-    nativeGasETH: '0.009901',
+    balanceUSD: 49.09,
+    nativeGasETH: '0.009876',
+    nativeGasArbETH: '0.009761',
+    contractBase: ENV.arbitrageContractBase || '0xD4A284DC95C17f981b7BaDD4b31Ae5Ae89854018',
+    contractArbitrum: ENV.arbitrageContractArbitrum || '0xD4A284DC95C17f981b7BaDD4b31Ae5Ae89854018',
     minTargetUSD: 0.25,
-    tokensTracked: 100,
+    tokensTracked: 27,
     triangularCycles: 17100,
     scansCount: 0,
     executedCount: 0,
@@ -305,10 +308,44 @@ app.get('/api/cex-lag', (req, res) => {
   });
 });
 
+async function refreshOnChainBalances() {
+  try {
+    const { ethers } = await import('ethers');
+    const walletAddr = SERVER_STATS.spotBase.wallet;
+    const baseProvider = new ethers.JsonRpcProvider('https://mainnet.base.org');
+    const arbProvider = new ethers.JsonRpcProvider('https://arb1.arbitrum.io/rpc');
+
+    const [baseBal, arbBal] = await Promise.all([
+      baseProvider.getBalance(walletAddr).catch(() => null),
+      arbProvider.getBalance(walletAddr).catch(() => null),
+    ]);
+
+    const ethPrice = cexLagPredictor.getCEXPrice('ETH') || 2500;
+    let totalEth = 0;
+
+    if (baseBal != null) {
+      const bEth = parseFloat(ethers.formatEther(baseBal));
+      SERVER_STATS.spotBase.nativeGasETH = bEth.toFixed(6);
+      totalEth += bEth;
+    }
+    if (arbBal != null) {
+      const aEth = parseFloat(ethers.formatEther(arbBal));
+      SERVER_STATS.spotBase.nativeGasArbETH = aEth.toFixed(6);
+      totalEth += aEth;
+    }
+    if (totalEth > 0) {
+      SERVER_STATS.spotBase.balanceUSD = parseFloat((totalEth * ethPrice).toFixed(2));
+    }
+  } catch {}
+}
+
 export function startServer(initialPort: number = ENV.port) {
   loadPersistedStats();
   cexLagPredictor.startMonitoring(2000).catch(() => {});
   binanceWebSocketFeed.start();
+  refreshOnChainBalances();
+  setInterval(refreshOnChainBalances, 20000);
+
   const server = app.listen(initialPort, () => {
     logger.info(`🌐 Servidor de monitoreo V2 ejecutándose en http://localhost:${initialPort}`);
     logger.info(`   -> Dashboard Web: http://localhost:${initialPort}`);
